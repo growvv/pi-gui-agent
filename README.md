@@ -47,7 +47,7 @@ AndroidWorld benchmark 适配与运行方法见 [`benchmark/README.md`](benchmar
 - Node.js 22.19+
 - Android SDK Platform Tools，确保 `adb devices` 能看到目标设备
 - 推荐在目标设备安装 [ADB Keyboard](https://github.com/senzhk/ADBKeyBoard)，用于中文、emoji、复杂标点和多行文本输入
-- 至少配置一种 pi 支持的模型。可使用环境变量，例如 `ANTHROPIC_API_KEY`、`OPENAI_API_KEY`，也可先运行全局安装的 `pi` 完成 `/login`
+- 至少配置一种 pi 支持的模型，鉴权方式见 [`docs/authentication.md`](docs/authentication.md)
 
 安装：
 
