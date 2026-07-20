@@ -1,0 +1,40 @@
+ARG ANDROIDWORLD_IMAGE=android_world:latest
+FROM ${ANDROIDWORLD_IMAGE}
+
+ARG NODE_VERSION=22.22.3
+ARG AGENT_UID=1000
+ARG AGENT_GID=1000
+
+RUN curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
+    | tar -xJ -C /usr/local --strip-components=1 \
+    && (getent group "${AGENT_GID}" >/dev/null || groupadd --gid "${AGENT_GID}" agent) \
+    && (id agent >/dev/null 2>&1 || useradd --uid "${AGENT_UID}" --gid "${AGENT_GID}" --create-home --shell /bin/bash agent) \
+    && mkdir -p /workspace/pi-gui-agent /output /download-cache \
+    && chown -R "${AGENT_UID}:${AGENT_GID}" /workspace/pi-gui-agent /output /download-cache
+
+COPY docker/androidworld/start-worker.sh /usr/local/bin/androidworld-worker
+RUN chmod 0755 /usr/local/bin/androidworld-worker
+
+COPY agents/pi_gui/package.json agents/pi_gui/package-lock.json /opt/android-gui-mcp/
+RUN cd /opt/android-gui-mcp && npm ci
+COPY agents/pi_gui/tsconfig.json /opt/android-gui-mcp/tsconfig.json
+COPY agents/pi_gui/src /opt/android-gui-mcp/src
+RUN cd /opt/android-gui-mcp \
+    && npm run build \
+    && npm prune --omit=dev
+
+# Keep a clean AVD seed in the image. Each runtime worker copies this seed into
+# its container-local AVD directory, so emulator state is never persisted.
+RUN mkdir -p /opt/android-avd-template \
+    && cp -a /root/.android/avd/. /opt/android-avd-template/
+
+COPY requirements.txt /opt/pi-gui-agent/requirements.txt
+RUN python3 -m pip install --no-cache-dir -r /opt/pi-gui-agent/requirements.txt
+
+ENV ANDROIDWORLD_AGENT_USER=agent \
+    ANDROIDWORLD_AGENT_HOME=/home/agent \
+    ANDROID_GUI_MCP_BIN=/opt/android-gui-mcp/dist/mcp.js \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/:/workspace/pi-gui-agent
+WORKDIR /workspace/pi-gui-agent
+ENTRYPOINT ["/usr/local/bin/androidworld-worker"]

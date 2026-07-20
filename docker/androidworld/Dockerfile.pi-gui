@@ -1,0 +1,2 @@
+ARG BASE_IMAGE=pi-gui-agent/androidworld-base:latest
+FROM ${BASE_IMAGE}

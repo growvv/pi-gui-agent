@@ -1,0 +1,46 @@
+ARG MOBILEWORLD_IMAGE=ghcr.io/tongyi-mai/mobile_world:latest
+FROM ${MOBILEWORLD_IMAGE}
+
+ARG NODE_VERSION=22.19.0
+ARG NODE_MIRROR_URL=https://npmmirror.com/mirrors/node
+ARG NPM_REGISTRY
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG http_proxy
+ARG https_proxy
+ENV NO_PROXY=localhost,127.0.0.1,10.0.2.2
+
+# The upstream image has Node 18 and adb, but pi-gui requires Node 22.
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xz-utils \
+    && rm -rf /var/lib/apt/lists/* \
+    && (curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
+      || curl -fsSL "${NODE_MIRROR_URL}/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz") \
+    | tar -xJ -C /usr/local --strip-components=1
+
+WORKDIR /opt/pi-gui-agent
+COPY agents/pi_gui/package.json agents/pi_gui/package-lock.json ./
+RUN if [ -n "${NPM_REGISTRY}" ]; then \
+      npm ci --registry="${NPM_REGISTRY}"; \
+    else \
+      npm ci || npm ci --registry=https://registry.npmmirror.com; \
+    fi \
+    && npm cache clean --force
+COPY agents/pi_gui/tsconfig.json ./
+COPY agents/pi_gui/src ./src
+COPY agents/pi_gui/skills ./skills
+RUN npm run build && npm prune --omit=dev && rm -rf src tsconfig.json
+
+# Use the AVD snapshot shipped by MobileWorld and avoid rebuilding the Python
+# environment on every container start.
+RUN sed -i 's/-no-snapshot /-snapshot init_state -no-snapshot-save /' /app/docker/start_emulator.sh \
+    && sed -i 's/uv run mobile-world viewer/uv run --no-sync mobile-world viewer/g' /usr/local/bin/entrypoint.sh \
+    && sed -i 's/uv run mobile-world server/uv run --no-sync mobile-world server/g' /usr/local/bin/entrypoint.sh
+
+ENV PI_GUI_CONTAINER_ROOT=/opt/pi-gui-agent \
+    PI_GUI_NODE=/usr/local/bin/node \
+    PI_GUI_ADB=/opt/android-sdk/platform-tools/adb
+
+COPY experiments/mobileworld ./experiments/mobileworld
+RUN chmod -R a+rX /app/service/src/mobile_world
+ENV PYTHONPATH=/opt/pi-gui-agent

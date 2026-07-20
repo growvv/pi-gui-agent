@@ -1,0 +1,18 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-smoke-vlc"
+workers = 2
+
+[agent]
+learning = false
+
+[suite]
+tasks = [
+    "VlcCreatePlaylist",
+    "VlcCreateTwoPlaylists"
+]
+setup_mode = "always"
+
+[container]
+name_prefix = "pi-gui-smoke-vlc"

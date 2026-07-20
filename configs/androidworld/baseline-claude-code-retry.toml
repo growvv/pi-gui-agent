@@ -1,0 +1,35 @@
+extends = "baseline-claude-code.toml"
+
+[experiment]
+name = "androidworld-baseline-claude-code-retry"
+workers = 5
+
+[suite]
+tasks = [
+  "SimpleCalendarAddRepeatingEvent",
+  "SimpleCalendarNextMeetingWithPerson",
+  "SimpleSmsReplyMostRecent",
+  "SystemBrightnessMinVerify",
+  "TasksIncompleteTasksOnDate",
+  "RetroPlayingQueue",
+  "SimpleSmsResend",
+  "SimpleSmsSendReceivedAddress",
+  "SportsTrackerActivitiesCountForWeek",
+  "SystemCopyToClipboard",
+  "SimpleSmsSendClipboardContent",
+  "SystemBluetoothTurnOnVerify",
+  "TasksCompletedTasksForDate",
+  "SimpleCalendarEventOnDateAtTime",
+  "SportsTrackerTotalDistanceForCategoryOverInterval",
+  "SystemBluetoothTurnOff",
+  "SystemWifiTurnOffVerify",
+  "TurnOnWifiAndOpenApp",
+  "SimpleCalendarDeleteEventsOnRelativeDay",
+  "SimpleCalendarEventsInNextWeek",
+  "SystemBluetoothTurnOffVerify",
+  "SystemWifiTurnOn",
+  "VlcCreateTwoPlaylists",
+]
+
+[container]
+name_prefix = "pi-gui-baseline-claude-retry"

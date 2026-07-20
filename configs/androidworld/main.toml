@@ -1,0 +1,14 @@
+extends = "common.toml"
+
+[experiment]
+name = "androidworld-main"
+
+[agent]
+name = "pi-gui"
+provider = "xiaomi-token-plan-cn"
+model = "mimo-v2.5"
+thinking = "high"
+learning = false
+
+[container]
+forward_env = ["XIAOMI_TOKEN_PLAN_CN_API_KEY"]

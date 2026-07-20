@@ -1,0 +1,19 @@
+[experiment]
+name = "mobileworld-smoke"
+workers = 2
+
+[agent]
+provider = "xiaomi-token-plan-cn"
+model = "mimo-v2.5"
+thinking = "low"
+learning = false
+max_actions = 100
+
+[suite]
+tasks = ["OpenFlightModeTask", "CloseFlightModeTask"]
+max_retries = 0
+
+[mobileworld]
+image = "pi-gui-agent/mobileworld:latest"
+reuse_containers = true
+keep_containers = true

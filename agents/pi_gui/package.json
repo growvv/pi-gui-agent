@@ -1,0 +1,31 @@
+{
+  "name": "pi-gui-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A native agentic-loop Android GUI and CLI agent built on pi-coding-agent",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "stress:provider": "tsx src/provider-stress.ts",
+    "start": "tsx src/cli.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "^0.80.7",
+    "@earendil-works/pi-coding-agent": "^0.80.7",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "commander": "^14.0.0",
+    "fast-xml-parser": "^5.2.5",
+    "typebox": "^1.0.56",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}

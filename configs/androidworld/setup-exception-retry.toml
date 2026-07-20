@@ -1,0 +1,20 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-setup-exception-retry"
+workers = 5
+
+[agent]
+learning = false
+
+[suite]
+tasks = [
+  "SimpleSmsReplyMostRecent",
+  "SimpleSmsResend",
+  "SimpleSmsSendReceivedAddress",
+  "VlcCreatePlaylist",
+  "VlcCreateTwoPlaylists",
+]
+
+[container]
+name_prefix = "pi-gui-androidworld-setup-retry"

@@ -2,6 +2,12 @@
 
 pi-gui-agent 不单独保存或解析 API Key，而是复用 pi 的模型注册表和鉴权存储。主任务 session 与任务后的 review session 使用同一套模型与鉴权配置。
 
+以下项目命令均在 `agents/pi_gui` 目录执行：
+
+```bash
+cd agents/pi_gui
+```
+
 ## 使用环境变量
 
 在运行项目的同一个 shell 中导出对应 provider 的环境变量：
@@ -35,7 +41,26 @@ npm start -- \
 
 完整列表和模型 ID 以 [pi provider 文档](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/providers.md) 为准。
 
-项目没有自动加载 `.env` 文件的逻辑。若将 Key 写在 `.env` 中，需要先通过 shell 或其他环境管理工具将其导入当前进程；项目的 `.gitignore` 已排除 `.env` 和 `.env.*`。不要把真实 Key 写入源码、公开文档或提交到 Git。
+pi-gui 本地 CLI 不自动加载 `.env`。若将 Key 写在文件中，需要先通过 shell 或环境
+管理工具导入当前进程。不要把真实 Key 写入源码、公开文档或提交到 Git。
+
+## 实验容器
+
+AndroidWorld 配置的 `container.env_file` 会作为 Docker `--env-file` 读取，默认值是仓库
+根目录的 `.env`：
+
+```bash
+cp .env.example .env
+```
+
+主试验需要 `XIAOMI_TOKEN_PLAN_CN_API_KEY`；Claude Code baseline 使用
+`ANTHROPIC_AUTH_TOKEN`/`ANTHROPIC_BASE_URL`，Codex baseline 使用
+`OPENAI_API_KEY`/`OPENAI_BASE_URL`。OpenClaw 默认还会只读挂载 `~/.openclaw`，路径可在
+对应 TOML 中修改。
+
+若不使用 env file，可从配置中删除 `env_file`，并把需要的变量名加入
+`container.forward_env`。runner 只转发列出的变量，不把 secret 值写入 manifest。
+`.gitignore` 已排除 `.env` 和 `.env.*`（保留 `.env.example`）。
 
 ## 复用 pi 登录状态
 

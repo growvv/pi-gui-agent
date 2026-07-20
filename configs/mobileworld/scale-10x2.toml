@@ -1,0 +1,38 @@
+[experiment]
+name = "mobileworld-scale-10x2"
+workers = 10
+
+[agent]
+thinking = "low"
+learning = false
+max_actions = 1
+
+[suite]
+tasks = [
+  "AdjustFontIconMaximumTask",
+  "AdjustBrightnessMaximumTask",
+  "AdjustBrightnessMinimumTask",
+  "CloseFlightModeTask",
+  "ChangeWallpaperTask",
+  "AdjustFontIconMinimumTask",
+  "OpenFlightModeTask",
+  "SetAlarmTask",
+  "TakeSelfieTask",
+  "SMSManagement",
+  "CountFileLinesTask",
+  "SumFileLinesTask",
+  "BidFileRenameTask",
+  "CheckInvoiceTask1",
+  "CheckInvoiceTask2",
+  "InvoiceReceiptCopyTask",
+  "SharePhotosTask",
+  "ReadQwen3PaperTask1",
+  "ReadQwen3PaperTask2",
+  "SendInvoiceWithInfoTask",
+]
+max_retries = 0
+
+[mobileworld]
+image = "pi-gui-agent/mobileworld:latest"
+reuse_containers = true
+keep_containers = true

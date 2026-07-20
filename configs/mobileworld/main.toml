@@ -1,0 +1,18 @@
+[experiment]
+name = "mobileworld-all"
+workers = 5
+
+[agent]
+provider = "xiaomi-token-plan-cn"
+model = "mimo-v2.5"
+thinking = "high"
+learning = true
+max_actions = 100
+
+[suite]
+tasks = []
+
+[mobileworld]
+image = "pi-gui-agent/mobileworld:latest"
+reuse_containers = true
+keep_containers = true

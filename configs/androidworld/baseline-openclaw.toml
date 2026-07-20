@@ -1,0 +1,14 @@
+extends = "common.toml"
+
+[experiment]
+name = "androidworld-baseline-openclaw"
+
+[agent]
+name = "openclaw"
+thinking = "high"
+openclaw_model = "mimo-v2.5"
+
+[container]
+agent_config_dir = "~/.openclaw"
+forward_env = ["XIAOMI_TOKEN_PLAN_CN_API_KEY"]
+name_prefix = "pi-gui-baseline-openclaw"

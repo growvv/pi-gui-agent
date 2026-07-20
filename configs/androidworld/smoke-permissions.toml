@@ -1,0 +1,14 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-smoke-permissions"
+workers = 1
+
+[agent]
+learning = false
+
+[suite]
+tasks = ["SystemWifiTurnOff"]
+
+[container]
+name_prefix = "pi-gui-smoke-permissions"

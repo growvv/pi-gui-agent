@@ -1,0 +1,42 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-small"
+workers = 5
+
+[agent]
+learning = true
+
+[suite]
+# 20-task stratified subset based on AndroidWorld's official complexity score:
+# easy <= 1.2 (7), medium 1.3-2.4 (7), hard >= 2.8 (6).
+tasks = [
+  # Easy
+  "CameraTakePhoto",
+  "ClockTimerEntry",
+  "NotesRecipeIngredientCount",
+  "SimpleCalendarNextEvent",
+  "SportsTrackerLongestDistanceActivity",
+  "SystemWifiTurnOn",
+  "TasksDueOnDate",
+
+  # Medium
+  "AudioRecorderRecordAudioWithFileName",
+  "BrowserMultiply",
+  "FilesMoveFile",
+  "MarkorCreateNoteAndSms",
+  "OsmAndMarker",
+  "RecipeAddSingleRecipe",
+  "SportsTrackerTotalDistanceForCategoryOverInterval",
+
+  # Hard
+  "ExpenseAddMultiple",
+  "MarkorMergeNotes",
+  "OsmAndTrack",
+  "RecipeAddMultipleRecipesFromImage",
+  "RetroSavePlaylist",
+  "VlcCreateTwoPlaylists",
+]
+
+[container]
+name_prefix = "pi-gui-androidworld-small"

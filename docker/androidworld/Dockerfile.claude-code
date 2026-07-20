@@ -1,0 +1,7 @@
+ARG BASE_IMAGE=pi-gui-agent/androidworld-base:latest
+FROM ${BASE_IMAGE}
+
+# The native installer endpoint is region-dependent; the official npm package
+# produces the same self-contained Claude Code CLI inside the image.
+RUN npm install --global @anthropic-ai/claude-code@2.1.214
+ENV CLAUDE_BIN=/usr/local/bin/claude

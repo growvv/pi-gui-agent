@@ -1,0 +1,50 @@
+[experiment]
+name = "mobileworld-small"
+workers = 5
+
+[agent]
+provider = "xiaomi-token-plan-cn"
+model = "mimo-v2.5"
+thinking = "high"
+learning = true
+max_actions = 100
+
+[suite]
+# MobileWorld has no official difficulty field. This 20-task GUI-only subset is
+# stratified by interaction length, number of apps, and information synthesis:
+# 7 easy, 7 medium, and 6 hard tasks.
+tasks = [
+  # Easy: short, single-app actions or lookups.
+  "AdjustBrightnessMaximumTask",
+  "OpenFlightModeTask",
+  "TakeSelfieTask",
+  "MastodonNewPostTask",
+  "AcceptMeetingTask",
+  "SendWaiverTask",
+  "CheckPuchasedItem",
+
+  # Medium: multi-step single-app tasks or focused two-app handoffs.
+  "ChangeWallpaperTask",
+  "SetAlarmTask",
+  "InvoiceReceiptCopyTask",
+  "CheckConferenceAndSendSmsTask1",
+  "MattermostCreateChannelTask",
+  "CheckGithubInfoTask",
+  "CartInfoNotificationTask",
+
+  # Hard: long, cross-app workflows with filtering or synthesis.
+  "SMSManagement",
+  "MastodonShareLocationTask",
+  "MattermostCustomerFeedbackAnalysisTask",
+  "GraduationMassEmailTask",
+  "SuggestPaperTask",
+  "MattermostProjectStatusReportTask",
+]
+max_retries = 2
+step_wait_seconds = 1.0
+
+[mobileworld]
+image = "pi-gui-agent/mobileworld:latest"
+reuse_containers = true
+keep_containers = true
+proxy_url = "http://127.0.0.1:7892"

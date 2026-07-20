@@ -1,0 +1,35 @@
+[experiment]
+name = "mobileworld-small-retry"
+workers = 5
+
+[agent]
+provider = "xiaomi-token-plan-cn"
+model = "mimo-v2.5"
+thinking = "high"
+learning = true
+max_actions = 100
+
+[suite]
+# Retry the nine scored failures and the two tasks whose evaluator result was
+# missing from mobileworld-small-20260719T151741+0000.
+tasks = [
+  "AdjustBrightnessMaximumTask",
+  "CheckConferenceAndSendSmsTask1",
+  "CheckPuchasedItem",
+  "GraduationMassEmailTask",
+  "MastodonShareLocationTask",
+  "MattermostCreateChannelTask",
+  "MattermostProjectStatusReportTask",
+  "SMSManagement",
+  "SuggestPaperTask",
+  "CartInfoNotificationTask",
+  "MattermostCustomerFeedbackAnalysisTask",
+]
+max_retries = 2
+step_wait_seconds = 1.0
+
+[mobileworld]
+image = "pi-gui-agent/mobileworld:latest"
+reuse_containers = true
+keep_containers = true
+proxy_url = "http://127.0.0.1:7892"

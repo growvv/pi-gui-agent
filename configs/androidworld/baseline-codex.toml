@@ -1,0 +1,11 @@
+extends = "common.toml"
+
+[experiment]
+name = "androidworld-baseline-codex"
+
+[agent]
+name = "codex"
+thinking = "high"
+
+[container]
+name_prefix = "pi-gui-baseline-codex"

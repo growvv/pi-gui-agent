@@ -1,0 +1,21 @@
+[experiment]
+name = "androidworld"
+workers = 10
+output_root = "benchmark-results"
+
+[suite]
+family = "android_world"
+combinations = 1
+seed = 30
+setup_mode = "always"
+timeout_seconds = 1800
+action_budget_multiplier = 2.0
+min_actions = 30
+max_model_tokens = 4096
+settle_ms = 1500
+
+[container]
+name_prefix = "pi-gui-androidworld"
+env_file = ".env"
+download_cache_dir = "~/.cache/pi-gui-agent/androidworld"
+keep_containers = false

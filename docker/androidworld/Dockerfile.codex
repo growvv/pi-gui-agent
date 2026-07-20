@@ -1,0 +1,5 @@
+ARG BASE_IMAGE=pi-gui-agent/androidworld-base:latest
+FROM ${BASE_IMAGE}
+
+RUN npm install --global @openai/codex@0.144.6
+ENV CODEX_BIN=/usr/local/bin/codex

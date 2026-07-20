@@ -1,0 +1,9 @@
+.git
+benchmark-results
+frames
+**/node_modules
+**/dist
+**/__pycache__
+*.log
+.pi
+runs

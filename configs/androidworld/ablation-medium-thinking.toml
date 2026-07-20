@@ -1,0 +1,7 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-ablation-medium-thinking"
+
+[agent]
+thinking = "medium"

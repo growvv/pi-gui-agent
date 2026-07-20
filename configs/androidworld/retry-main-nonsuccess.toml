@@ -1,0 +1,90 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-main-nonsuccess-retry"
+workers = 2
+
+[agent]
+provider = "openai"
+model = "mimo-v2.5"
+learning = false
+
+[container]
+forward_env = []
+
+[suite]
+tasks = [
+  "AudioRecorderRecordAudioWithFileName",
+  "BrowserDraw",
+  "BrowserMaze",
+  "BrowserMultiply",
+  "CameraTakePhoto",
+  "ClockStopWatchPausedVerify",
+  "ClockStopWatchRunning",
+  "ClockTimerEntry",
+  "ContactsNewContactDraft",
+  "ExpenseAddMultipleFromGallery",
+  "ExpenseAddMultipleFromMarkor",
+  "ExpenseAddSingle",
+  "ExpenseDeleteMultiple2",
+  "MarkorAddNoteHeader",
+  "MarkorCreateNote",
+  "MarkorCreateNoteAndSms",
+  "MarkorCreateNoteFromClipboard",
+  "MarkorEditNote",
+  "MarkorMergeNotes",
+  "MarkorTranscribeReceipt",
+  "MarkorTranscribeVideo",
+  "NotesRecipeIngredientCount",
+  "OsmAndMarker",
+  "OsmAndTrack",
+  "RecipeAddMultipleRecipesFromImage",
+  "RecipeAddMultipleRecipesFromMarkor",
+  "RecipeAddMultipleRecipesFromMarkor2",
+  "RecipeAddSingleRecipe",
+  "RecipeDeleteDuplicateRecipes",
+  "RecipeDeleteDuplicateRecipes2",
+  "RecipeDeleteDuplicateRecipes3",
+  "RecipeDeleteMultipleRecipesWithNoise",
+  "RecipeDeleteSingleWithRecipeWithNoise",
+  "RetroCreatePlaylist",
+  "RetroPlayingQueue",
+  "RetroPlaylistDuration",
+  "RetroSavePlaylist",
+  "SaveCopyOfReceiptTaskEval",
+  "SimpleCalendarAddOneEvent",
+  "SimpleCalendarAddOneEventInTwoWeeks",
+  "SimpleCalendarAddOneEventRelativeDay",
+  "SimpleCalendarAddOneEventTomorrow",
+  "SimpleCalendarAddRepeatingEvent",
+  "SimpleCalendarAnyEventsOnDate",
+  "SimpleCalendarDeleteEvents",
+  "SimpleCalendarDeleteEventsOnRelativeDay",
+  "SimpleCalendarDeleteOneEvent",
+  "SimpleCalendarEventOnDateAtTime",
+  "SimpleCalendarEventsInNextWeek",
+  "SimpleCalendarEventsOnDate",
+  "SimpleCalendarFirstEventAfterStartTime",
+  "SimpleCalendarNextEvent",
+  "SimpleCalendarNextMeetingWithPerson",
+  "SimpleDrawProCreateDrawing",
+  "SimpleSmsReply",
+  "SimpleSmsReplyMostRecent",
+  "SimpleSmsResend",
+  "SimpleSmsSend",
+  "SimpleSmsSendClipboardContent",
+  "SimpleSmsSendReceivedAddress",
+  "SportsTrackerActivitiesCountForWeek",
+  "SportsTrackerActivitiesOnDate",
+  "SportsTrackerActivityDuration",
+  "SportsTrackerLongestDistanceActivity",
+  "SportsTrackerTotalDurationForCategoryThisWeek",
+  "SystemBluetoothTurnOn",
+  "SystemBrightnessMax",
+  "SystemBrightnessMaxVerify",
+  "SystemBrightnessMin",
+  "SystemWifiTurnOff",
+  "TasksDueNextWeek",
+  "VlcCreatePlaylist",
+  "VlcCreateTwoPlaylists",
+]

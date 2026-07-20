@@ -1,0 +1,11 @@
+extends = "baseline-claude-code.toml"
+
+[experiment]
+name = "androidworld-baseline-claude-code-markor-delete-smoke"
+workers = 1
+
+[suite]
+tasks = ["MarkorDeleteAllNotes"]
+
+[container]
+name_prefix = "pi-gui-baseline-claude-markor-delete-smoke"

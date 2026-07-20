@@ -1,0 +1,7 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-ablation-no-learning"
+
+[agent]
+learning = false

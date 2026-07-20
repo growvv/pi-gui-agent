@@ -1,0 +1,5 @@
+ARG BASE_IMAGE=pi-gui-agent/androidworld-base:latest
+FROM ${BASE_IMAGE}
+
+RUN npm install --global openclaw@2026.7.1-2
+ENV OPENCLAW_BIN=/usr/local/bin/openclaw

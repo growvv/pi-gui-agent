@@ -1,0 +1,26 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-smoke-hard"
+workers = 3
+
+[agent]
+learning = true
+
+[suite]
+tasks = [
+  "ContactsNewContactDraft",
+  "MarkorTranscribeVideo",
+  "OsmAndMarker",
+  "RecipeAddMultipleRecipesFromImage",
+  "RecipeAddMultipleRecipesFromMarkor2",
+  "RecipeDeleteDuplicateRecipes3",
+  "RetroPlaylistDuration",
+  "TasksDueNextWeek",
+  "TasksCompletedTasksForDate"
+]
+setup_mode = "auto"
+
+[container]
+name_prefix = "pi-gui-smoke-hard"
+keep_containers = true

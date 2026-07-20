@@ -1,0 +1,29 @@
+extends = "small.toml"
+
+[experiment]
+name = "androidworld-small-retry"
+workers = 5
+
+[agent]
+learning = true
+
+[suite]
+# Retry the cases marked Task Failed in the 2026-07-19 small benchmark.
+tasks = [
+  "OsmAndTrack",
+  "TasksDueOnDate",
+  "MarkorCreateNoteAndSms",
+  "MarkorMergeNotes",
+  "SportsTrackerLongestDistanceActivity",
+  "ClockTimerEntry",
+  "SimpleCalendarNextEvent",
+  "AudioRecorderRecordAudioWithFileName",
+  "BrowserMultiply",
+  "CameraTakePhoto",
+  "RecipeAddMultipleRecipesFromImage",
+  "RetroSavePlaylist",
+  "VlcCreateTwoPlaylists",
+]
+
+[container]
+name_prefix = "pi-gui-androidworld-small-retry"
