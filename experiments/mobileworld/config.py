@@ -25,8 +25,10 @@ class AgentSettings:
   model: str | None = None
   thinking: str = 'medium'
   learning: bool = False
+  disable_ledger_tool: bool = False
   timeout_seconds: int = 1800
   max_actions: int = 50
+  max_steps: int = 100
   max_model_tokens: int = 4096
   settle_ms: int = 1500
 
@@ -112,9 +114,12 @@ def _validate(config: MobileWorldConfig) -> None:
     raise ValueError('experiment.workers must be positive')
   if bool(config.agent.provider) != bool(config.agent.model):
     raise ValueError('agent.provider and agent.model must be supplied together')
+  if not isinstance(config.agent.disable_ledger_tool, bool):
+    raise ValueError('agent.disable_ledger_tool must be a boolean')
   positive = {
       'timeout_seconds': config.agent.timeout_seconds,
       'max_actions': config.agent.max_actions,
+      'max_steps': config.agent.max_steps,
       'max_model_tokens': config.agent.max_model_tokens,
       'step_wait_seconds': config.suite.step_wait_seconds,
   }

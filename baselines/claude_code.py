@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 import re
 import time
-from typing import Any
 
 from experiments.androidworld.agent import AndroidWorldCodingAgent, decode_output
 
@@ -28,7 +27,7 @@ class ClaudeCodeAgent(AndroidWorldCodingAgent):
   def build_command(self, prompt: str, max_actions: int, result_file: Path) -> list[str]:
     config = result_file.parent / 'claude-mcp.json'
     config.write_text(json.dumps({
-        'mcpServers': {'android-gui': self._mcp_server(max_actions)},
+        'mcpServers': self.mcp_servers(max_actions, self._current_goal or prompt),
     }), encoding='utf8')
     config.chmod(0o644)
     return self._claude_command(prompt, config)
@@ -41,12 +40,6 @@ class ClaudeCodeAgent(AndroidWorldCodingAgent):
 
   def _prompt(self, goal: str) -> str:
     return f'{MCP_STARTUP_PROMPT}\n\n{super()._prompt(goal)}'
-
-  def _mcp_server(self, max_actions: int) -> dict[str, Any]:
-    return {
-        'command': 'node',
-        'args': self.mcp_args(max_actions),
-    }
 
   def archive_run(self, goal, result):
     session_id = claude_session_id(result.stdout)

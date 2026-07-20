@@ -86,7 +86,23 @@ cache。
 | `provider` / `model` | pi-gui 显式模型，两者必须同时提供或省略 |
 | `thinking` | Agent thinking level |
 | `learning` | pi-gui 任务后复盘开关 |
+| `enable_ledger_tool` | 是否为 Claude Code、Codex、OpenClaw 额外注册 `ledger` MCP server；默认 `false` |
+| `disable_ledger_tool` | pi-gui 是否关闭 ledger 工具和对应 prompt；默认 `false` |
 | `openclaw_model` | OpenClaw 模型 ID |
+
+三个 baseline 默认只获得 `android-gui` MCP server，其中包含 `screenshot`、`tap`、
+`long_press`、`swipe`、`type_text`、`open_app` 和 `back`。需要进行 ledger tool
+处理组实验时，在对应配置中显式开启：
+
+```toml
+[agent]
+enable_ledger_tool = true
+```
+
+开启后会额外注册独立的 `ledger` MCP server，提供 `update_ledger`、
+`reflect_on_ledger`、`validate_ledger`、`answer` 和 `finish`；关闭或省略该字段时，
+这些工具不会出现在 MCP 工具列表中。每个 episode 的 ledger 写入该 worker 输出目录下的
+`ledgers/`。
 
 ### `suite`
 

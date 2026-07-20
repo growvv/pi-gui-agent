@@ -1,0 +1,19 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-fastapi-smoke"
+workers = 1
+
+[suite]
+transport = "fastapi"
+tasks = [
+  "SimpleSmsReplyMostRecent",
+  "SimpleSmsSendReceivedAddress",
+  "SimpleSmsResend",
+  "BrowserMaze",
+  "BrowserDraw",
+  "BrowserMultiply"
+]
+
+[container]
+name_prefix = "pi-gui-androidworld-fastapi-smoke"

@@ -70,6 +70,21 @@ cp .env.example .env
 ./scripts/run-ablation-experiments.sh
 ```
 
+默认 `suite.transport = "direct"`，保持原有的进程内 AndroidWorld Python API
+评测。需要使用官方 FastAPI 边界时，将配置设为 `suite.transport = "fastapi"`；
+可先运行单 worker 示例：
+
+```bash
+python3 -m experiments.androidworld.parallel \
+  configs/androidworld/fastapi-smoke.toml --dry-run
+python3 -m experiments.androidworld.parallel \
+  configs/androidworld/fastapi-smoke.toml
+```
+
+FastAPI 模式中，task 初始化、截图、UI state、所有动作、计分和 teardown 都经过
+HTTP server，agent 不接收 ADB 参数。该模式目前仅支持 `pi-gui`，并要求
+`setup_mode = "always"`。
+
 公共参数在 `configs/androidworld/common.toml`，各实验配置只覆盖差异。完整配置说明、
 容器要求、结果结构和保留成绩见 [docs/experiments.md](docs/experiments.md)。
 

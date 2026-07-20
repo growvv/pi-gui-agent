@@ -1,0 +1,14 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-all-pi-gui-disable-ledger"
+workers = 2
+
+[agent]
+disable_ledger_tool = true
+
+[suite]
+tasks = []
+
+[container]
+name_prefix = "pi-gui-androidworld-all-disable-ledger"

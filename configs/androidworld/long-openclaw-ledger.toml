@@ -1,0 +1,10 @@
+extends = "long-openclaw.toml"
+
+[experiment]
+name = "androidworld-long-openclaw-ledger"
+
+[agent]
+enable_ledger_tool = true
+
+[container]
+name_prefix = "openclaw-androidworld-long-ledger"

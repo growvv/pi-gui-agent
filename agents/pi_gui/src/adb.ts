@@ -11,6 +11,18 @@ export interface ScreenSize {
   height: number;
 }
 
+export interface UiElement {
+  index: number;
+  text?: string;
+  contentDesc?: string;
+  resourceId?: string;
+  className?: string;
+  clickable: boolean;
+  enabled: boolean;
+  bounds: string;
+  center: { x: number; y: number };
+}
+
 export interface AdbOptions {
   adbPath?: string;
   serial?: string;
@@ -18,7 +30,20 @@ export interface AdbOptions {
   onWarning?: (message: string) => void;
 }
 
-export class AdbDevice {
+export interface AndroidDevice {
+  screenshot(): Promise<Buffer>;
+  screenSize(): Promise<ScreenSize>;
+  tap(x: number, y: number): Promise<void>;
+  swipe(x1: number, y1: number, x2: number, y2: number, durationMs?: number): Promise<void>;
+  typeText(text: string): Promise<void>;
+  key(keyCode: string): Promise<void>;
+  openApp(name: string): Promise<void>;
+  uiElements(): Promise<UiElement[]>;
+  clickElement(element: UiElement): Promise<void>;
+  restoreInputMethod(): Promise<void>;
+}
+
+export class AdbDevice implements AndroidDevice {
   readonly adbPath: string;
   readonly serial?: string;
   readonly timeoutMs: number;
@@ -114,9 +139,38 @@ export class AdbDevice {
   }
 
   async visibleText(): Promise<string[]> {
-    const nodes = await this.uiNodes();
-    return [...new Set(nodes.flatMap((node) => [node.text, node["content-desc"]])
+    const elements = await this.uiElements();
+    return [...new Set(elements.flatMap((element) => [element.text, element.contentDesc])
       .filter((value): value is string => typeof value === "string" && value.trim().length > 0))];
+  }
+
+  async uiElements(): Promise<UiElement[]> {
+    const nodes = await this.uiNodes();
+    return nodes
+      .filter((node) => typeof node.bounds === "string" && (
+        node.clickable === "true" || hasText(node.text) || hasText(node["content-desc"]) ||
+        hasText(node["resource-id"])
+      ))
+      .map((node, index) => {
+        const bounds = node.bounds as string;
+        return {
+          index,
+          text: optionalText(node.text),
+          contentDesc: optionalText(node["content-desc"]),
+          resourceId: optionalText(node["resource-id"]),
+          className: optionalText(node.class),
+          clickable: node.clickable === "true",
+          enabled: node.enabled !== "false",
+          bounds,
+          center: boundsCenter(bounds),
+        };
+      });
+  }
+
+  async clickElement(element: UiElement): Promise<void> {
+    if (!element.enabled) throw new Error(`UI element [${element.index}] is disabled`);
+    if (!element.clickable) throw new Error(`UI element [${element.index}] is not clickable`);
+    await this.tap(element.center.x, element.center.y);
   }
 
   async hasFocusedEditableNode(): Promise<boolean> {
@@ -191,4 +245,22 @@ export class AdbDevice {
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function hasText(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function optionalText(value: unknown): string | undefined {
+  return hasText(value) ? value : undefined;
+}
+
+export function boundsCenter(bounds: string): { x: number; y: number } {
+  const match = /^\[(\d+),(\d+)]\[(\d+),(\d+)]$/.exec(bounds);
+  if (!match) throw new Error(`Invalid UI element bounds: ${bounds}`);
+  const [, x1, y1, x2, y2] = match.map(Number);
+  return {
+    x: Math.round((x1! + x2!) / 2),
+    y: Math.round((y1! + y2!) / 2),
+  };
 }

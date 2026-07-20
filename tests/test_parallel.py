@@ -1,6 +1,7 @@
 from pathlib import Path
 from dataclasses import replace
 import io
+import json
 import tempfile
 import unittest
 from unittest import mock
@@ -9,12 +10,42 @@ from experiments.androidworld.config import load_config
 from experiments.androidworld.parallel import (
     _balanced_shards,
     _docker_command,
+    _ensure_worker_network,
+    _wait_for_start_capacity,
     _prepare_workers,
     _relay_worker_output,
 )
 
 
 class ParallelRunnerTest(unittest.TestCase):
+
+  def test_waits_for_cpu_to_be_stably_below_startup_threshold(self):
+    settings = mock.Mock(
+        worker_start_interval_seconds=0,
+        startup_cpu_max_percent=30,
+        startup_cpu_stable_samples=2,
+        startup_cpu_timeout_seconds=60,
+    )
+    with (
+        mock.patch(
+            'experiments.androidworld.parallel._host_cpu_percent',
+            side_effect=[80, 20, 40, 20, 10],
+        ) as cpu,
+        mock.patch('experiments.androidworld.parallel.time.sleep'),
+        mock.patch('experiments.androidworld.parallel.time.monotonic', side_effect=range(20)),
+    ):
+      _wait_for_start_capacity(settings, 2)
+
+    self.assertEqual(cpu.call_count, 5)
+
+  def test_skips_cpu_wait_when_throttling_is_disabled(self):
+    settings = mock.Mock(
+        worker_start_interval_seconds=0,
+        startup_cpu_max_percent=None,
+    )
+    with mock.patch('experiments.androidworld.parallel._host_cpu_percent') as cpu:
+      _wait_for_start_capacity(settings, 2)
+    cpu.assert_not_called()
 
   def test_relays_worker_output_to_log_and_terminal(self):
     stream = io.StringIO('booting\nrunning\n')
@@ -52,7 +83,56 @@ class ParallelRunnerTest(unittest.TestCase):
     self.assertNotIn('--thinking', command)
     self.assertNotIn('--tasks', command)
     self.assertIn('ANDROID_WORLD_DOWNLOAD_CACHE_DIR=/download-cache', command)
+    network_index = command.index('--network')
+    self.assertEqual(command[network_index + 1], 'pi-gui-androidworld-ipv6')
     self.assertNotIn('/root/.android/avd', command)
+
+  def test_creates_ipv6_network_for_emulator_modem(self):
+    created_network = '[{"EnableIPv6":true,"IPAM":{"Config":[' \
+        '{"Subnet":"fd42:7069:6775::/64"}]}}]'
+    missing = mock.Mock(returncode=1, stdout='', stderr='not found')
+    created = mock.Mock(returncode=0, stdout='network-id\n', stderr='')
+    inspected = mock.Mock(returncode=0, stdout=created_network, stderr='')
+    with mock.patch(
+        'experiments.androidworld.parallel.subprocess.run',
+        side_effect=[missing, created, inspected],
+    ) as run:
+      self.assertEqual(_ensure_worker_network(), 'pi-gui-androidworld-ipv6')
+    self.assertEqual(
+        run.call_args_list[1].args[0],
+        [
+            'docker', 'network', 'create', '--driver', 'bridge', '--ipv6',
+            '--subnet', 'fd42:7069:6775::/64', 'pi-gui-androidworld-ipv6',
+        ],
+    )
+
+  def test_rejects_existing_network_without_ipv6(self):
+    inspected = mock.Mock(
+        returncode=0,
+        stdout='[{"EnableIPv6":false,"IPAM":{"Config":[]}}]', stderr='',
+    )
+    with mock.patch(
+        'experiments.androidworld.parallel.subprocess.run',
+        return_value=inspected,
+    ):
+      with self.assertRaisesRegex(RuntimeError, 'must have IPv6 enabled'):
+        _ensure_worker_network()
+
+  def test_fastapi_transport_selects_http_runner(self):
+    config = load_config('configs/androidworld/fastapi-smoke.toml')
+    with tempfile.TemporaryDirectory() as temporary:
+      root = Path(temporary)
+      (root / '.env').write_text(
+          'XIAOMI_TOKEN_PLAN_CN_API_KEY=test\n', encoding='utf8',
+      )
+      worker = root / 'worker-1'
+      worker.mkdir()
+      command = _docker_command(
+          config, root, worker, worker / 'config.json', 'worker-1',
+          create_cache=False,
+      )
+    self.assertIn('experiments.androidworld.http_run', command)
+    self.assertNotIn('experiments.androidworld.run', command)
 
   def test_keep_containers_omits_rm_and_uses_run_specific_names(self):
     config = load_config('configs/androidworld/main.toml')
@@ -118,6 +198,10 @@ class ParallelRunnerTest(unittest.TestCase):
         path = worker_dir / directory
         self.assertTrue(path.is_dir())
         self.assertEqual(path.stat().st_uid, root.stat().st_uid)
+      state = json.loads((worker_dir / 'state.json').read_text(encoding='utf8'))
+      self.assertEqual(state['status'], 'pending')
+      self.assertEqual(state['max_steps'], 100)
+      self.assertEqual(state['tasks'][0]['task_name'], 'Task')
 
 
 if __name__ == '__main__':

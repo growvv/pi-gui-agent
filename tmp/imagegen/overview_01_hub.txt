@@ -1,0 +1,24 @@
+Use case: infographic-diagram
+Asset type: camera-ready overview figure for a computer science paper
+Input images: Image 1 is the primary style reference; Image 2 is a secondary style and subject reference. Match their academic visual language: white background, real-looking phone screenshots, thin blue thought boxes, orange action arrows, green structured-state panels, serif explanatory text, compact but readable composition.
+
+Create a wide 16:9 overview figure for the paper titled exactly:
+"CodeDroid: Executable Task State Management for Long-Horizon Hybrid Mobile Agents"
+
+Composition concept: LEDGER HUB.
+Place a large executable Bash document named "ledger.sh" at the visual center. Show short valid-looking records inside it: task, subtask, complete_subtask, reflection, validation, finish. Around it, show a hybrid coding agent interacting with an Android phone through GUI actions on the left and a terminal through CLI/Bash actions on the right. Use a circular feedback loop through the center.
+
+Show exactly three first-class ledger tools as clear labeled calls around the central script:
+"update_ledger" for Decompose & Track
+"reflect_on_ledger" for Diagnose & Redirect
+"validate_ledger" for Verify Before Finish
+
+Show the causal flow: User Task -> Hybrid Agent -> GUI / CLI Actions -> Observations -> ledger.sh -> Updated Next Action. Show "finish" only after validation. Include a small gate icon between validate_ledger and finish.
+
+Core message, rendered verbatim near the bottom:
+"Task progress as executable code"
+Smaller supporting line:
+"Code is both the means of action and the means of progress management."
+
+Style: closely match Image 1, polished academic paper figure, real phone and terminal surfaces, hand-drawn-style blue/orange labels, green executable-ledger centerpiece, restrained red only for failed actions, crisp typography, dense visual hierarchy, no decorative effects.
+Constraints: no caption, no benchmark numbers, no logos, no watermark, no gradients, no 3D, no generic dashboard cards, no invented tools, no misspelled labels, no large empty areas.

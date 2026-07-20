@@ -1,0 +1,30 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-fastapi-smoke3"
+workers = 1
+
+[suite]
+transport = "fastapi"
+tasks = [
+  "ClockStopWatchRunning",
+  "ClockTimerEntry",
+  "ContactsNewContactDraft",
+  "ExpenseAddMultipleFromGallery",
+  "ExpenseAddMultipleFromMarkor",
+  "MarkorCreateNoteFromClipboard",
+  "MarkorMergeNotes",
+  "OsmAndTrack",
+  "RecipeDeleteDuplicateRecipes3",
+  "RetroPlayingQueue",
+  "SimpleCalendarAddOneEventRelativeDay",
+  "SimpleCalendarNextMeetingWithPerson",
+  "SimpleSmsReply",
+  "SimpleSmsSend",
+  "SimpleSmsSendClipboardContent",
+  "SportsTrackerTotalDurationForCategoryThisWeek",
+  "TasksCompletedTasksForDate"
+]
+
+[container]
+name_prefix = "pi-gui-androidworld-fastapi-smoke"

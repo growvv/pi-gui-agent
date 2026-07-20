@@ -1,0 +1,10 @@
+extends = "all-claude-code.toml"
+
+[experiment]
+name = "androidworld-all-claude-code-ledger"
+
+[agent]
+enable_ledger_tool = true
+
+[container]
+name_prefix = "claude-code-androidworld-all-ledger"

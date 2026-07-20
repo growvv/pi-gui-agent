@@ -1,0 +1,54 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-main-fix"
+workers = 10
+
+[suite]
+# Retry the 37 failed and 3 exception cases from
+# benchmark-results/androidworld-main-20260720T031307+0800.
+tasks = [
+  "BrowserDraw",
+  "BrowserMaze",
+  "BrowserMultiply",
+  "CameraTakePhoto",
+  "ClockStopWatchPausedVerify",
+  "ClockStopWatchRunning",
+  "ClockTimerEntry",
+  "ContactsNewContactDraft",
+  "ExpenseAddMultipleFromGallery",
+  "ExpenseAddMultipleFromMarkor",
+  "MarkorAddNoteHeader",
+  "MarkorCreateNoteAndSms",
+  "MarkorCreateNoteFromClipboard",
+  "MarkorMergeNotes",
+  "MarkorTranscribeReceipt",
+  "MarkorTranscribeVideo",
+  "OsmAndMarker",
+  "OsmAndTrack",
+  "RecipeAddMultipleRecipesFromImage",
+  "RecipeDeleteDuplicateRecipes2",
+  "RecipeDeleteDuplicateRecipes3",
+  "RetroPlayingQueue",
+  "RetroPlaylistDuration",
+  "RetroSavePlaylist",
+  "SimpleCalendarAddOneEventRelativeDay",
+  "SimpleCalendarNextMeetingWithPerson",
+  "SimpleDrawProCreateDrawing",
+  "SimpleSmsReply",
+  "SimpleSmsReplyMostRecent",
+  "SimpleSmsResend",
+  "SimpleSmsSend",
+  "SimpleSmsSendClipboardContent",
+  "SimpleSmsSendReceivedAddress",
+  "SportsTrackerActivitiesOnDate",
+  "SportsTrackerTotalDurationForCategoryThisWeek",
+  "SystemBluetoothTurnOff",
+  "SystemBrightnessMax",
+  "TasksCompletedTasksForDate",
+  "TasksHighPriorityTasksDueOnDate",
+  "TasksIncompleteTasksOnDate",
+]
+
+[container]
+name_prefix = "pi-gui-androidworld-main-fix"

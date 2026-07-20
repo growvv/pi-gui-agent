@@ -4,13 +4,16 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Type } from "typebox";
-import { AdbDevice, type ScreenSize } from "./adb.js";
+import type { AndroidDevice, ScreenSize, UiElement } from "./adb.js";
 import { resolveApp } from "./apps.js";
 
 export interface AgentState {
   actions: number;
+  steps?: number;
   answer?: string;
   finished: boolean;
+  aborted?: boolean;
+  abortReason?: string;
   lastUiFingerprint?: string;
   lastActionSignature?: string;
   unchangedActions?: number;
@@ -24,6 +27,7 @@ export interface AgentState {
   ledgerPath?: string;
   ledgerDigest?: string;
   ledgerSource?: string;
+  lastUiElements?: UiElement[];
 }
 
 export interface ToolOptions {
@@ -31,6 +35,7 @@ export interface ToolOptions {
   maxActions?: number;
   maxNoProgressActions?: number;
   ledgerRequired?: boolean;
+  ledgerEnabled?: boolean;
   originalTask?: string;
   ledgerDir?: string;
   screenshotArchiveDir?: string;
@@ -39,6 +44,9 @@ export interface ToolOptions {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const LEDGER_KINDS = ["subtask", "subtask_for_validate", "complete_subtask", "complete"] as const;
+const LEDGER_TOOL_NAMES = new Set([
+  "update_ledger", "reflect_on_ledger", "validate_ledger", "answer", "finish",
+]);
 type LedgerKind = typeof LEDGER_KINDS[number];
 
 interface LedgerRecordInput {
@@ -131,15 +139,16 @@ function image(buffer: Buffer): ImageContent {
 }
 
 export function createAndroidTools(
-  device: AdbDevice,
+  device: AndroidDevice,
   state: AgentState,
   options: ToolOptions = {},
 ): ToolDefinition[] {
   const settleMs = options.settleMs ?? 1_500;
   const maxActions = options.maxActions ?? 30;
   const maxNoProgressActions = options.maxNoProgressActions ?? 4;
+  const ledgerEnabled = options.ledgerEnabled ?? true;
   const ledgerDir = resolve(options.ledgerDir ?? ".pi/ledgers");
-  state.ledgerRequired = options.ledgerRequired;
+  state.ledgerRequired = ledgerEnabled && options.ledgerRequired;
 
   const commitLedger = async (source: string) => {
     if (!state.ledgerPath) throw new Error("Managed ledger path was not initialized.");
@@ -182,7 +191,11 @@ export function createAndroidTools(
   };
 
   const observe = async (message: string, progressMessage?: string) => {
-    const [visibleText, screenshot] = await Promise.all([device.visibleText(), device.screenshot()]);
+    const [uiElements, screenshot] = await Promise.all([device.uiElements(), device.screenshot()]);
+    state.lastUiElements = uiElements;
+    const visibleText = [...new Set(uiElements.flatMap((element) => [element.text, element.contentDesc])
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0))];
+    const elementList = uiElements.map(formatUiElement).join("\n");
     const fingerprint = createHash("sha256").update(screenshot).update("\0").update(visibleText.join("\n")).digest("hex");
     const observedAt = new Date().toISOString();
     let archivePath: string | undefined;
@@ -200,7 +213,7 @@ export function createAndroidTools(
     return {
     content: [{
       type: "text" as const,
-      text: `${message}${progressMessage ? `\n\n${progressMessage}` : ""}\nObserved at: ${observedAt}\nScreenshot fingerprint: ${fingerprint}\nScreenshot archive: ${archivePath ?? (archiveError ? `failed: ${archiveError}` : "disabled")}\nVisible UI text:\n${visibleText.join("\n") || "(none)"}`,
+      text: `${message}${progressMessage ? `\n\n${progressMessage}` : ""}\nObserved at: ${observedAt}\nScreenshot fingerprint: ${fingerprint}\nScreenshot archive: ${archivePath ?? (archiveError ? `failed: ${archiveError}` : "disabled")}\nVisible UI text:\n${visibleText.join("\n") || "(none)"}\nUI elements:\n${elementList || "(none)"}`,
     }, image(screenshot)],
     details: { observedAt, fingerprint, archivePath, archiveError },
     fingerprint,
@@ -244,15 +257,30 @@ export function createAndroidTools(
     };
   };
 
-  return [
+  const tools = [
     defineTool({
       name: "screenshot",
       label: "Screenshot",
-      description: "Capture the current screen and visible UI text without performing an action.",
+      description: "Capture the current screen and visible UI elements without performing an action. The result includes `Screenshot archive: <path>`, which is the output path of the saved PNG when screenshot archiving is enabled.",
       parameters: Type.Object({}),
       execute: async () => {
         const result = await observe("Current screen:");
         return { content: result.content, details: result.details };
+      },
+    }),
+    defineTool({
+      name: "click",
+      label: "Click UI element",
+      description: "Click a clickable UI element by the index shown in the latest screenshot or action result. Take a new screenshot if the UI has changed.",
+      parameters: Type.Object({ index: Type.Integer({ minimum: 0 }) }),
+      execute: async (_id, { index }) => {
+        const observed = state.lastUiElements?.find((element) => element.index === index);
+        if (!observed) throw new Error(`UI element [${index}] was not present in the latest observation. Take a screenshot and use a listed index.`);
+        const current = (await device.uiElements()).find((element) => element.index === index);
+        if (!current || uiElementIdentity(current) !== uiElementIdentity(observed)) {
+          throw new Error(`UI element [${index}] changed since the latest observation. Take a new screenshot before clicking.`);
+        }
+        return act(`click:${uiElementIdentity(current)}`, `Clicked UI element [${index}]`, () => device.clickElement(current));
       },
     }),
     defineTool({
@@ -417,8 +445,12 @@ export function createAndroidTools(
         state.ledgerOutput = output;
         const bookkeeping = `Tracked subtasks: ${completed.size}/${declared.length} marked complete${openSubtasks.length ? `; open: ${openSubtasks.join(", ")}` : ""}.`;
         const next = task_completed
-          ? "Call finish next."
-          : "Continue the GUI task, update the ledger when work completes, then validate again before finish.";
+          ? state.ledgerRequired
+            ? "Call finish next."
+            : "Semantic validation is complete; stop only after the final result is verified."
+          : state.ledgerRequired
+            ? "Continue the GUI task, update the ledger when work completes, then validate again before finish."
+            : "Continue the GUI task, update the ledger when work completes, then validate again before stopping.";
         return {
           content: [{ type: "text", text: `LEDGER VALIDATION RECORDED: ${status.toUpperCase()}\n${output}\n${bookkeeping}\n${next}` }],
           details: { taskCompleted: task_completed, summary: output, declared, completed: [...completed], openSubtasks },
@@ -474,4 +506,23 @@ export function createAndroidTools(
       },
     }),
   ] as ToolDefinition[];
+  return ledgerEnabled
+    ? tools
+    : tools.filter((tool) => !LEDGER_TOOL_NAMES.has(tool.name));
+}
+
+function uiElementIdentity(element: UiElement): string {
+  return [element.resourceId, element.contentDesc, element.text, element.className, element.bounds].join("\0");
+}
+
+function formatUiElement(element: UiElement): string {
+  const attributes = [
+    element.text ? `text=${JSON.stringify(element.text)}` : undefined,
+    element.contentDesc ? `desc=${JSON.stringify(element.contentDesc)}` : undefined,
+    element.resourceId ? `id=${JSON.stringify(element.resourceId)}` : undefined,
+    `clickable=${element.clickable}`,
+    `enabled=${element.enabled}`,
+    `bounds=${element.bounds}`,
+  ].filter(Boolean).join(" ");
+  return `[${element.index}] ${element.className ?? "Element"} ${attributes}`;
 }

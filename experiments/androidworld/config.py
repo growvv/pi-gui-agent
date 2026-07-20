@@ -18,6 +18,10 @@ class ExperimentSettings:
   name: str
   workers: int = 4
   output_root: str = 'benchmark-results'
+  worker_start_interval_seconds: float = 0.0
+  startup_cpu_max_percent: float | None = None
+  startup_cpu_stable_samples: int = 3
+  startup_cpu_timeout_seconds: float = 600.0
 
 
 @dataclass(frozen=True)
@@ -27,12 +31,16 @@ class AgentSettings:
   model: str | None = None
   thinking: str = 'medium'
   learning: bool = False
+  enable_ledger_tool: bool = False
+  disable_ledger_tool: bool = False
+  max_steps: int = 100
   openclaw_model: str = 'mimo-v2.5'
 
 
 @dataclass(frozen=True)
 class SuiteSettings:
   family: str = 'android_world'
+  transport: str = 'direct'
   tasks: tuple[str, ...] = ()
   combinations: int = 1
   seed: int = 30
@@ -81,6 +89,7 @@ class AndroidWorldConfig:
             'grpc_port': 8554,
             'checkpoint_dir': f'{output_dir}/checkpoints',
             'session_dir': f'{output_dir}/runs',
+            'server_url': 'http://127.0.0.1:5000',
         },
     }
 
@@ -93,6 +102,7 @@ class WorkerSettings:
   grpc_port: int
   checkpoint_dir: str
   session_dir: str
+  server_url: str = 'http://127.0.0.1:5000'
 
 
 @dataclass(frozen=True)
@@ -134,6 +144,7 @@ def load_worker_config(path_value: str | Path) -> WorkerConfig:
   )
   _validate_agent(config.agent)
   _validate_suite(config.suite)
+  _validate_transport(config.agent, config.suite)
   return config
 
 
@@ -189,21 +200,42 @@ def _validate(config: AndroidWorldConfig) -> None:
     raise ValueError('experiment.name must be a filesystem-safe name')
   if config.experiment.workers < 1:
     raise ValueError('experiment.workers must be positive')
+  experiment = config.experiment
+  if experiment.worker_start_interval_seconds < 0:
+    raise ValueError('experiment.worker_start_interval_seconds must not be negative')
+  if (
+      experiment.startup_cpu_max_percent is not None and
+      not 0 < experiment.startup_cpu_max_percent <= 100
+  ):
+    raise ValueError('experiment.startup_cpu_max_percent must be in (0, 100]')
+  if experiment.startup_cpu_stable_samples < 1:
+    raise ValueError('experiment.startup_cpu_stable_samples must be positive')
+  if experiment.startup_cpu_timeout_seconds <= 0:
+    raise ValueError('experiment.startup_cpu_timeout_seconds must be positive')
   output_root = Path(config.experiment.output_root)
   if output_root.is_absolute() or '..' in output_root.parts:
     raise ValueError('experiment.output_root must stay inside the repository')
   _validate_agent(config.agent)
   _validate_suite(config.suite)
+  _validate_transport(config.agent, config.suite)
 
 
 def _validate_agent(agent: AgentSettings) -> None:
   if agent.name not in AGENT_NAMES:
     raise ValueError(f'agent.name must be one of {AGENT_NAMES}')
+  if not isinstance(agent.enable_ledger_tool, bool):
+    raise ValueError('agent.enable_ledger_tool must be a boolean')
+  if not isinstance(agent.disable_ledger_tool, bool):
+    raise ValueError('agent.disable_ledger_tool must be a boolean')
   if bool(agent.provider) != bool(agent.model):
     raise ValueError('agent.provider and agent.model must be supplied together')
+  if agent.max_steps <= 0:
+    raise ValueError('agent.max_steps must be positive')
 
 
 def _validate_suite(suite: SuiteSettings) -> None:
+  if suite.transport not in ('direct', 'fastapi'):
+    raise ValueError('suite.transport must be direct or fastapi')
   if suite.setup_mode not in ('auto', 'always', 'never'):
     raise ValueError('suite.setup_mode must be auto, always, or never')
   positive = {
@@ -218,3 +250,14 @@ def _validate_suite(suite: SuiteSettings) -> None:
     raise ValueError(f'Suite values must be positive: {invalid}')
   if suite.settle_ms < 0:
     raise ValueError('suite.settle_ms must not be negative')
+
+
+def _validate_transport(agent: AgentSettings, suite: SuiteSettings) -> None:
+  if suite.transport != 'fastapi':
+    return
+  if agent.name != 'pi-gui':
+    raise ValueError('suite.transport = fastapi currently supports agent.name = pi-gui')
+  if suite.setup_mode != 'always':
+    raise ValueError('suite.transport = fastapi requires suite.setup_mode = always')
+  if suite.fixed_task_seed:
+    raise ValueError('FastAPI suite reinitialization does not support fixed_task_seed')

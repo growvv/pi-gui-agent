@@ -43,6 +43,35 @@ until [[ "$(adb -s "${serial}" shell getprop sys.boot_completed 2>/dev/null || t
   sleep 5
 done
 
+# Emulator 36.x runs the modem simulator over IPv6 loopback. QEMU resolves
+# that endpoint with AI_ADDRCONFIG, which requires a non-loopback IPv6 address
+# on the worker container. Fail early instead of turning all SMS tasks into
+# ordinary benchmark failures when the Docker network is misconfigured.
+telephony_deadline=$((SECONDS + ${ANDROIDWORLD_TELEPHONY_TIMEOUT_SECONDS:-60}))
+while true; do
+  sim_state="$(adb -s "${serial}" shell getprop gsm.sim.state 2>/dev/null || true)"
+  service_state="$(
+    adb -s "${serial}" shell dumpsys telephony.registry 2>/dev/null \
+      | grep -m1 'mServiceState=' || true
+  )"
+  if [[ "${sim_state}" =~ (LOADED|READY) ]] && \
+     [[ "${service_state}" == *'IN_SERVICE'* ]]; then
+    break
+  fi
+  if grep -q 'Unable to connect character device modem' "${log_file}"; then
+    echo 'Android emulator modem failed to start.' >&2
+    echo 'Run this worker on an IPv6-enabled Docker network.' >&2
+    grep 'Unable to connect character device modem' "${log_file}" >&2 || true
+    exit 1
+  fi
+  if (( SECONDS >= telephony_deadline )); then
+    echo "Android telephony did not become ready (SIM=${sim_state:-empty})." >&2
+    echo "${service_state:-No telephony service state available.}" >&2
+    exit 1
+  fi
+  sleep 2
+done
+
 # APKs are downloaded once on the host and exposed through a read-only mount.
 if [[ -f /download-cache/ADBKeyboard.apk ]] && \
    ! adb -s "${serial}" shell pm path com.android.adbkeyboard >/dev/null 2>&1; then

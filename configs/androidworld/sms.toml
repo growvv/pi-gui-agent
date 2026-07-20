@@ -1,0 +1,22 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-sms"
+workers = 2
+
+[agent]
+name = "pi-gui"
+
+[suite]
+tasks = [
+  "MarkorCreateNoteAndSms",
+  "SimpleSmsReply",
+  "SimpleSmsReplyMostRecent",
+  "SimpleSmsResend",
+  "SimpleSmsSend",
+  "SimpleSmsSendClipboardContent",
+  "SimpleSmsSendReceivedAddress",
+]
+
+[container]
+name_prefix = "pi-gui-androidworld-sms"

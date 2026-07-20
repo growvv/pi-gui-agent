@@ -19,6 +19,7 @@ from android_world.utils import app_snapshot, file_utils
 
 from .config import load_worker_config
 from .factory import create_agent
+from .state import StateTrackingCheckpointer, write_worker_state
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,10 +30,24 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
   config = load_worker_config(parse_args().config)
+  state_path = Path(config.runtime.checkpoint_dir).parent / 'state.json'
+  max_steps = getattr(config.agent, 'max_steps', 100)
+  episodes = []
+  tracking_checkpointer = None
+  write_worker_state(
+      state_path, config.suite.tasks, config.suite.combinations, episodes,
+      max_steps, 'running',
+  )
   os.environ.setdefault('GRPC_VERBOSITY', 'ERROR')
   os.environ.setdefault('GRPC_TRACE', 'none')
   _increase_activity_start_timeout()
   _configure_download_cache()
+  _stabilize_camera_setup()
+  _stabilize_chrome_setup()
+  _stabilize_clipper_setup()
+  _stabilize_contacts_setup()
+  _stabilize_simple_sms_setup()
+  _stabilize_vlc_setup()
   restore_accessibility_route = _route_accessibility_over_adb(
       config.runtime.adb_path, config.runtime.console_port,
   )
@@ -80,17 +95,41 @@ def main() -> None:
         min_actions=suite_settings.min_actions,
         max_model_tokens=suite_settings.max_model_tokens,
         learning=config.agent.learning,
+        max_steps=max_steps,
         provider=config.agent.provider,
         model=config.agent.model,
         openclaw_model=config.agent.openclaw_model,
+        enable_ledger_tool=config.agent.enable_ledger_tool,
+        disable_ledger_tool=config.agent.disable_ledger_tool,
+    )
+    tracking_checkpointer = StateTrackingCheckpointer(
+        checkpointer.IncrementalCheckpointer(runtime.checkpoint_dir),
+        lambda saved: write_worker_state(
+            state_path, config.suite.tasks, config.suite.combinations, saved,
+            max_steps, 'running',
+        ),
     )
     episodes = suite_utils.run(
         suite,
         agent,
-        checkpointer=checkpointer.IncrementalCheckpointer(runtime.checkpoint_dir),
+        checkpointer=tracking_checkpointer,
         demo_mode=False,
     )
+    write_worker_state(
+        state_path, config.suite.tasks, config.suite.combinations, episodes,
+        max_steps, 'completed',
+    )
     suite_utils.process_episodes(episodes, print_summary=True)
+  except Exception:
+    saved_episodes = (
+        tracking_checkpointer.episodes
+        if tracking_checkpointer is not None else episodes
+    )
+    write_worker_state(
+        state_path, config.suite.tasks, config.suite.combinations, saved_episodes,
+        max_steps, 'failed',
+    )
+    raise
   finally:
     environment.close()
 
@@ -207,12 +246,12 @@ def _ensure_vlc_database(env) -> None:
     # Drive both the upstream flow and VLC 3.5.4's newer notification flow.
     # Re-check every round because these screens can appear late under
     # parallel cold-start load.
-    for text in ('SKIP', 'Skip', 'GRANT PERMISSION', 'OK', 'Allow'):
-      try:
-        controller.click_element(text)
-        time.sleep(1.0)
-      except ValueError:
-        pass
+    _click_optional(
+        env, controller,
+        ('SKIP', 'Skip', 'GRANT PERMISSION', 'OK',
+         'Allow access to manage all files', 'Allow'),
+        rounds=1,
+    )
     time.sleep(2.0)
   raise RuntimeError(f'VLC setup did not create {database}.')
 
@@ -239,6 +278,233 @@ def _configure_download_cache() -> None:
   download_app._pi_gui_cached = True
   setup_apps.download_app_data = download_app
   a11y_grpc_wrapper._get_accessibility_forwarder_apk = download_forwarder
+
+
+def _stabilize_contacts_setup() -> None:
+  """Handle optional Contacts onboarding and verify the contact editor."""
+  contacts_class = setup_apps.ContactsApp
+  if getattr(contacts_class.setup, '_pi_gui_verified', False):
+    return
+
+  def setup(cls, env) -> None:
+    package = cls.package_name()
+    adb_utils.clear_app_data(package, env.controller)
+    adb_utils.launch_app(cls.app_name, env.controller)
+    controller = tools.AndroidToolController(env=env.controller)
+    try:
+      _click_optional(
+          env, controller, ('Skip', "Don't allow", 'Not now', 'Got it', 'OK'),
+      )
+
+      intent = (
+          'am start -a android.intent.action.INSERT '
+          '-t vnd.android.cursor.dir/contact'
+      )
+      for _ in range(5):
+        adb_utils.issue_generic_request(['shell', intent], env.controller)
+        time.sleep(2.0)
+        state = env.get_state(wait_to_stabilize=False)
+        labels = {
+            value.strip().casefold()
+            for element in state.ui_elements
+            for value in (element.text, element.content_description)
+            if value and value.strip()
+        }
+        if 'save' in labels:
+          adb_utils.press_back_button(env.controller)
+          time.sleep(1.0)
+          adb_utils.press_back_button(env.controller)
+          return
+        _click_optional(
+            env, controller,
+            ('Skip', "Don't allow", 'Not now', 'Got it', 'OK'), rounds=1,
+        )
+      raise RuntimeError('Contacts setup did not reach an editor with a Save action.')
+    finally:
+      adb_utils.close_app(cls.app_name, env.controller)
+
+  setup._pi_gui_verified = True
+  contacts_class.setup = classmethod(setup)
+
+
+def _click_optional(
+    env, controller, labels: tuple[str, ...], rounds: int = 8,
+) -> None:
+  for _ in range(rounds):
+    time.sleep(1.0)
+    state = env.get_state(wait_to_stabilize=False)
+    visible = {
+        element.text.strip().casefold()
+        for element in state.ui_elements
+        if element.text and element.text.strip()
+    }
+    label = next(
+        (value for value in labels if value.casefold() in visible), None,
+    )
+    if label is not None:
+      controller.click_element(label)
+      time.sleep(1.0)
+
+
+def _stabilize_camera_setup() -> None:
+  """Allow Camera onboarding to be absent or delayed."""
+  camera_class = setup_apps.CameraApp
+  if getattr(camera_class.setup, '_pi_gui_verified', False):
+    return
+
+  def setup(cls, env) -> None:
+    package = cls.package_name()
+    adb_utils.clear_app_data(package, env.controller)
+    try:
+      adb_utils.grant_permissions(
+          package, 'android.permission.ACCESS_COARSE_LOCATION', env.controller,
+      )
+    except Exception:  # Permission availability varies with the system image.
+      pass
+    adb_utils.launch_app(cls.app_name, env.controller)
+    try:
+      controller = tools.AndroidToolController(env=env.controller)
+      _click_optional(
+          env, controller, ('NEXT', 'Next', 'Continue', 'Got it', 'OK'),
+      )
+    finally:
+      adb_utils.close_app(cls.app_name, env.controller)
+
+  setup._pi_gui_verified = True
+  camera_class.setup = classmethod(setup)
+
+
+def _stabilize_clipper_setup() -> None:
+  """Complete optional Clipper onboarding and verify clipboard access."""
+  clipper_class = setup_apps.ClipperApp
+  if getattr(clipper_class.setup, '_pi_gui_verified', False):
+    return
+
+  def setup(cls, env) -> None:
+    adb_utils.clear_app_data(cls.package_name(), env.controller)
+    adb_utils.launch_app(cls.app_name, env.controller)
+    try:
+      controller = tools.AndroidToolController(env=env.controller)
+      _click_optional(
+          env, controller, ('Continue', 'CONTINUE', 'OK', 'Allow'),
+      )
+      adb_utils.set_clipboard_contents('pi-gui-setup-check', env.controller)
+    finally:
+      adb_utils.close_app(cls.app_name, env.controller)
+
+  setup._pi_gui_verified = True
+  clipper_class.setup = classmethod(setup)
+
+
+def _stabilize_simple_sms_setup() -> None:
+  """Set and verify the Android SMS role without relying on onboarding text."""
+  sms_class = setup_apps.SimpleSMSMessengerApp
+  if getattr(sms_class.setup, '_pi_gui_verified', False):
+    return
+
+  def setup(cls, env) -> None:
+    package = cls.package_name()
+    adb_utils.clear_app_data(package, env.controller)
+    adb_utils.set_default_app(
+        'sms_default_application', package, env.controller,
+    )
+    adb_utils.issue_generic_request(
+        ['shell', 'cmd', 'role', 'add-role-holder',
+         'android.app.role.SMS', package],
+        env.controller,
+    )
+    for permission in (
+        'android.permission.READ_SMS', 'android.permission.RECEIVE_SMS',
+        'android.permission.SEND_SMS', 'android.permission.READ_CONTACTS',
+        'android.permission.POST_NOTIFICATIONS',
+    ):
+      try:
+        adb_utils.grant_permissions(package, permission, env.controller)
+      except Exception:  # Older app builds do not request every API 33 permission.
+        pass
+    adb_utils.launch_app(cls.app_name, env.controller)
+    try:
+      controller = tools.AndroidToolController(env=env.controller)
+      _click_optional(
+          env, controller,
+          ('SMS Messenger', 'Set as default', 'Allow', "Don't allow",
+           'Got it', 'OK'),
+      )
+      response = adb_utils.issue_generic_request(
+          ['shell', 'settings', 'get', 'secure',
+           'sms_default_application'],
+          env.controller,
+      )
+      default_app = response.generic.output.decode(errors='replace').strip()
+      if default_app != package:
+        raise RuntimeError(
+            f'Simple SMS Messenger is not the default SMS app: {default_app!r}'
+        )
+    finally:
+      adb_utils.close_app(cls.app_name, env.controller)
+
+  setup._pi_gui_verified = True
+  sms_class.setup = classmethod(setup)
+
+
+def _stabilize_chrome_setup() -> None:
+  """Tolerate Chrome onboarding variants and verify the browser is usable."""
+  chrome_class = setup_apps.ChromeApp
+  if getattr(chrome_class.setup, '_pi_gui_verified', False):
+    return
+
+  def setup(cls, env) -> None:
+    adb_utils.clear_app_data(cls.package_name(), env.controller)
+    adb_utils.launch_app(cls.app_name, env.controller)
+    try:
+      controller = tools.AndroidToolController(env=env.controller)
+      _click_optional(
+          env, controller,
+          ('Accept & continue', 'Use without an account', 'No thanks',
+           'Not now', "Don't allow", 'Got it', 'OK'),
+      )
+      adb_utils.issue_generic_request(
+          ['shell', 'am', 'start', '-a', 'android.intent.action.VIEW',
+           '-d', 'about:blank', '-p', cls.package_name()],
+          env.controller,
+      )
+      time.sleep(2.0)
+      current_package = adb_utils.extract_package_name(
+          adb_utils.get_current_activity(env.controller)[0]
+      )
+      if current_package != cls.package_name():
+        raise RuntimeError(
+            f'Chrome setup left {current_package!r} in the foreground.'
+        )
+    finally:
+      adb_utils.close_app(cls.app_name, env.controller)
+
+  setup._pi_gui_verified = True
+  chrome_class.setup = classmethod(setup)
+
+
+def _stabilize_vlc_setup() -> None:
+  """Pregrant VLC storage access and verify its media database exists."""
+  vlc_class = setup_apps.VlcApp
+  if getattr(vlc_class.setup, '_pi_gui_verified', False):
+    return
+
+  def setup(cls, env) -> None:
+    package = cls.package_name()
+    adb_utils.clear_app_data(package, env.controller)
+    adb_utils.grant_permissions(
+        package, 'android.permission.POST_NOTIFICATIONS', env.controller,
+    )
+    adb_utils.issue_generic_request(
+        ['shell', 'appops', 'set', package, 'MANAGE_EXTERNAL_STORAGE', 'allow'],
+        env.controller,
+    )
+    if not file_utils.check_directory_exists(cls.videos_path, env.controller):
+      file_utils.mkdir(cls.videos_path, env.controller)
+    _ensure_vlc_database(env)
+
+  setup._pi_gui_verified = True
+  vlc_class.setup = classmethod(setup)
 
 
 def _stabilize_sms_reads() -> None:

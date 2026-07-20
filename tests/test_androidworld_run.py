@@ -112,13 +112,15 @@ class AndroidWorldRunTest(unittest.TestCase):
       runner.adb_utils.issue_generic_request = mock.Mock()
       runner.adb_utils.close_app = mock.Mock()
       runner.time.sleep = mock.Mock()
-      runner._ensure_vlc_database(mock.Mock(controller='device'))
+      vlc_env = mock.Mock(controller='device')
+      vlc_env.get_state.return_value = types.SimpleNamespace(
+          ui_elements=[types.SimpleNamespace(text='SKIP')],
+      )
+      runner._ensure_vlc_database(vlc_env)
       clicked = [
           call.args[0] for call in vlc_controller.click_element.call_args_list
       ]
-      self.assertEqual(
-          clicked, ['SKIP', 'Skip', 'GRANT PERMISSION', 'OK', 'Allow'],
-      )
+      self.assertEqual(clicked, ['SKIP'])
       runner.adb_utils.close_app.assert_called_once_with('vlc', 'device')
       runner.app_snapshot.save_snapshot.assert_called_once_with('vlc', 'device')
       events = []
@@ -139,12 +141,19 @@ class AndroidWorldRunTest(unittest.TestCase):
           ),
           agent=types.SimpleNamespace(
               name='pi-gui', thinking='low', learning=False, provider=None,
-              model=None, openclaw_model='mimo',
+              model=None, openclaw_model='mimo', enable_ledger_tool=False,
+              disable_ledger_tool=False,
           ),
       )
       runner.parse_args = lambda: argparse.Namespace(config='worker.json')
       runner.load_worker_config = lambda _: config
       runner._configure_download_cache = mock.Mock()
+      runner._stabilize_camera_setup = mock.Mock()
+      runner._stabilize_chrome_setup = mock.Mock()
+      runner._stabilize_clipper_setup = mock.Mock()
+      runner._stabilize_contacts_setup = mock.Mock()
+      runner._stabilize_simple_sms_setup = mock.Mock()
+      runner._stabilize_vlc_setup = mock.Mock()
       runner._stabilize_sms_reads = mock.Mock()
       runner._route_accessibility_over_adb = mock.Mock(return_value=restore)
       runner.env_launcher.load_and_setup_env = mock.Mock(
@@ -166,6 +175,31 @@ class AndroidWorldRunTest(unittest.TestCase):
 
       self.assertEqual(events, ['setup', 'restore', 'run'])
       environment.close.assert_called_once_with()
+
+      modules['android_world'].constants = _module('android_world.constants')
+      sys.modules['android_world.constants'] = modules['android_world'].constants
+      sys.modules.pop('experiments.androidworld.http_run', None)
+      http_runner = importlib.import_module('experiments.androidworld.http_run')
+      http_runner._increase_activity_start_timeout = mock.Mock()
+      http_runner._configure_download_cache = mock.Mock()
+      http_runner._stabilize_camera_setup = mock.Mock()
+      http_runner._stabilize_chrome_setup = mock.Mock()
+      http_runner._stabilize_clipper_setup = mock.Mock()
+      http_runner._stabilize_contacts_setup = mock.Mock()
+      http_runner._stabilize_simple_sms_setup = mock.Mock()
+      http_runner._stabilize_vlc_setup = mock.Mock()
+      http_environment = mock.Mock()
+      http_runner.env_launcher.load_and_setup_env = mock.Mock(
+          return_value=http_environment,
+      )
+
+      http_runner._prepare_device(config)
+
+      http_runner.env_launcher.load_and_setup_env.assert_called_once_with(
+          console_port=5554, emulator_setup=True, adb_path='adb', grpc_port=8554,
+      )
+      http_environment.close.assert_called_once_with()
+      sys.modules.pop('experiments.androidworld.http_run', None)
     sys.modules.pop('experiments.androidworld.run', None)
 
 

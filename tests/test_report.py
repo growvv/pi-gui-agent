@@ -100,6 +100,68 @@ class ReportTest(unittest.TestCase):
       found = report.screenshot_ref(event, '', root)
     self.assertEqual(found, screenshot)
 
+  def test_loads_registry_app_names(self):
+    with tempfile.TemporaryDirectory() as temporary:
+      root = Path(temporary)
+      (root / 'registry_metadata.json').write_text(json.dumps({
+          'tasks': {
+              'Task': {'complexity': 1, 'app_names': ['settings']},
+          },
+      }), encoding='utf8')
+      app_names = report.load_registry_app_names([root])
+    self.assertEqual(app_names, {'Task': ['settings']})
+
+  def test_render_task_counts_only_thinking_and_action_events(self):
+    events = [
+        {'type': 'message', 'message': {
+            'role': 'user', 'content': 'Task: Open Settings'}},
+        {'type': 'message', 'message': {
+            'role': 'assistant', 'content': 'I will open Settings.'}},
+        {'type': 'message', 'message': {
+            'role': 'toolResult', 'content': 'Opened Settings.'}},
+        {'type': 'message', 'message': {
+            'role': 'assistant', 'content': 'The task is complete.'}},
+        {'type': 'compaction'},
+    ]
+    with tempfile.TemporaryDirectory() as temporary:
+      output = Path(temporary)
+      slug, steps = report.render_task(
+          'Task', 'Open Settings', events, None, output, output,
+          app_names=['settings'])
+      page = (output / f'{slug}.html').read_text(encoding='utf8')
+    self.assertEqual(steps, 2)
+    self.assertIn('<b>2</b> steps', page)
+    self.assertEqual(page.count('class="step-number">Step '), 2)
+    self.assertIn('class="step-number">Step 1', page)
+    self.assertIn('class="step-number">Step 2', page)
+    self.assertNotIn('class="step-number">Step 3', page)
+    self.assertIn('<span>Apps</span>settings', page)
+    self.assertIn('sessionStorage.getItem(indexStateKey)', page)
+    self.assertIn("document.querySelectorAll('a[href=\"index.html\"]')", page)
+
+  def test_index_displays_apps_and_renders_app_filter(self):
+    usage = report.token_usage([])
+    tasks = [
+        {'name': 'TaskA', 'goal': 'Use both apps', 'slug': 'TaskA',
+         'steps': 2, 'status': 'success', 'usage': usage,
+         'app_names': ['markor', 'clipper']},
+        {'name': 'TaskB', 'goal': 'Use one app', 'slug': 'TaskB',
+         'steps': 1, 'status': 'failed', 'usage': usage,
+         'app_names': ['markor']},
+    ]
+    with tempfile.TemporaryDirectory() as temporary:
+      output = Path(temporary)
+      report.render_index(tasks, output, {})
+      page = (output / 'index.html').read_text(encoding='utf8')
+    self.assertIn('id="appFilter"', page)
+    self.assertIn('<option value="markor">markor (2)</option>', page)
+    self.assertIn('<option value="clipper">clipper (1)</option>', page)
+    self.assertIn('<span class="task-apps"><b>Apps</b>markor · clipper</span>', page)
+    self.assertIn("rowApps.includes(selectedApp)", page)
+    self.assertIn("new URLSearchParams(location.search || savedQuery)", page)
+    self.assertIn("history.replaceState(null, '', url)", page)
+    self.assertIn('sessionStorage.setItem(stateKey', page)
+
   def test_merges_result_directories_in_order(self):
     with tempfile.TemporaryDirectory() as temporary:
       root = Path(temporary)

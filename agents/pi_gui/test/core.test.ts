@@ -2,23 +2,97 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { AdbDevice } from "../src/adb.js";
-import { shouldAbortAfterToolResult } from "../src/agent.js";
+import { AdbDevice, boundsCenter, type UiElement } from "../src/adb.js";
+import { HttpDevice } from "../src/http.js";
+import {
+  abortIfStepLimitReached,
+  DEFAULT_MAX_STEPS,
+  finalAssistantText,
+  isThinkingActionMessage,
+  latestMultimodalProviderError,
+  recordThinkingActionStep,
+} from "../src/agent.js";
 import { resolveApp } from "../src/apps.js";
 import { createAndroidTools, inspectExecutionLedger, normalizedPoint, type AgentState } from "../src/tools.js";
 import { LearningStore, summarizeTrajectory } from "../src/learning.js";
+import { SYSTEM_PROMPT, systemPrompt } from "../src/prompt.js";
 
 const temporaryDirectories: string[] = [];
 
 describe("Agent completion", () => {
-  it("stops the model loop after finish or a progress stall", () => {
-    expect(shouldAbortAfterToolResult({ finished: true })).toBe(true);
-    expect(shouldAbortAfterToolResult({ finished: false, stalled: true })).toBe(true);
-    expect(shouldAbortAfterToolResult({ finished: false, stalled: false })).toBe(false);
+  it("keeps the existing ledger prompt enabled and removes it for the ablation", () => {
+    expect(systemPrompt()).toBe(SYSTEM_PROMPT);
+    expect(systemPrompt(false)).not.toContain("ledger-use");
+    expect(systemPrompt(false)).not.toContain("Ledger completion");
+    expect(systemPrompt(false)).toContain("Act one step at a time");
+  });
+
+  it("extracts the normal final response used when ledger tools are disabled", () => {
+    expect(finalAssistantText([
+      { role: "user", content: "Task" },
+      { role: "assistant", content: [
+        { type: "thinking", thinking: "Done" },
+        { type: "text", text: "The visible answer is 42." },
+      ] },
+    ])).toBe("The visible answer is 42.");
+    expect(finalAssistantText([
+      { role: "assistant", content: [{ type: "toolCall", name: "tap" }] },
+    ])).toBeUndefined();
+  });
+
+  it("retries only the provider's corrupt multimodal response", () => {
+    expect(latestMultimodalProviderError([{ role: "assistant", stopReason: "error",
+      errorMessage: "400: Multimodal data is corrupted or cannot be processed." }])).toContain("400");
+    expect(latestMultimodalProviderError([{ role: "assistant", stopReason: "error",
+      errorMessage: "502: Bad Gateway" }])).toBeUndefined();
+    expect(latestMultimodalProviderError([{ role: "assistant", stopReason: "stop" }])).toBeUndefined();
+  });
+
+  it("counts only reportable Thinking & action messages as steps", () => {
+    const state: AgentState = { actions: 0, steps: 0, finished: false };
+    expect(isThinkingActionMessage({ role: "user", content: "Task" })).toBe(false);
+    expect(isThinkingActionMessage({ role: "assistant", content: [] })).toBe(false);
+    expect(recordThinkingActionStep(state, {
+      role: "assistant",
+      content: [{ type: "thinking", thinking: "Inspect the screen" }, {
+        type: "toolCall", name: "screenshot", arguments: {},
+      }],
+    })).toBe(true);
+    expect(recordThinkingActionStep(state, {
+      role: "toolResult", content: [{ type: "text", text: "Observed" }],
+    })).toBe(false);
+    expect(state.steps).toBe(1);
+  });
+
+  it("aborts before the step after the default limit", () => {
+    expect(DEFAULT_MAX_STEPS).toBe(100);
+    const state: AgentState = {
+      actions: 10, steps: DEFAULT_MAX_STEPS, finished: false,
+    };
+    expect(abortIfStepLimitReached(state, DEFAULT_MAX_STEPS)).toBe(true);
+    expect(state.aborted).toBe(true);
+    expect(state.abortReason).toContain("maximum 100");
+    expect(recordThinkingActionStep(state, {
+      role: "assistant", content: "This must not become step 61",
+    })).toBe(false);
+    expect(state.steps).toBe(100);
+  });
+
+  it("does not abort a task that already finished at the limit", () => {
+    const state: AgentState = {
+      actions: 10, steps: DEFAULT_MAX_STEPS, finished: true,
+    };
+    expect(abortIfStepLimitReached(state, DEFAULT_MAX_STEPS)).toBe(false);
+    expect(state.aborted).toBeUndefined();
   });
 });
 
 describe("AdbDevice", () => {
+  it("calculates the center of UI Automator bounds", () => {
+    expect(boundsCenter("[390,2022][690,2337]")).toEqual({ x: 540, y: 2180 });
+    expect(() => boundsCenter("invalid")).toThrow("Invalid UI element bounds");
+  });
+
   it("uses the screenshot dimensions in the current display orientation", async () => {
     const image = Buffer.alloc(24);
     Buffer.from("89504e470d0a1a0a", "hex").copy(image);
@@ -88,6 +162,30 @@ describe("AdbDevice", () => {
   });
 });
 
+describe("HttpDevice", () => {
+  it("sends swipe coordinates through the coordinate swipe endpoint", async () => {
+    let requestedUrl = "";
+    let received: RequestInit | undefined;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      requestedUrl = String(input);
+      received = init;
+      return new Response(JSON.stringify({ status: "success" }), { status: 200 });
+    };
+    try {
+      await new HttpDevice({ serverUrl: "http://127.0.0.1:5000" })
+        .swipe(10, 20, 30, 40, 500);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(requestedUrl).toBe("http://127.0.0.1:5000/pi/swipe");
+    expect(JSON.parse(String(received?.body))).toEqual(
+      { x1: 10, y1: 20, x2: 30, y2: 40, duration_ms: 500 },
+    );
+  });
+});
+
 describe("screenshot archiving", () => {
   it("still returns an observation when the archive cannot be written", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi-gui-archive-"));
@@ -128,7 +226,7 @@ describe("Android GUI tools", () => {
       .map((tool) => tool.name);
 
     expect(names).toEqual([
-      "screenshot", "tap", "long_press", "swipe", "type_text", "back", "open_app",
+      "screenshot", "click", "tap", "long_press", "swipe", "type_text", "back", "open_app",
       "update_ledger", "reflect_on_ledger", "validate_ledger", "answer", "finish",
     ]);
     expect(names).not.toContain("search_tools");
@@ -142,7 +240,41 @@ describe("Android GUI tools", () => {
 
     expect(result).toContain("Current screen:");
     expect(result).toContain("Visible UI text:");
+    expect(result).toContain("UI elements:");
     expect(state.actions).toBe(0);
+  });
+
+  it("documents the screenshot archive output path", () => {
+    const screenshot = createAndroidTools(
+      staticDevice(), { actions: 0, finished: false }, { settleMs: 0 },
+    ).find((tool) => tool.name === "screenshot")!;
+
+    expect(screenshot.description).toContain("Screenshot archive: <path>");
+    expect(screenshot.description).toContain("saved PNG");
+  });
+
+  it("clicks the center of an indexed UI element from the latest observation", async () => {
+    const device = staticDevice();
+    const taps: Array<[number, number]> = [];
+    device.tap = async (x, y) => { taps.push([x, y]); };
+    const state: AgentState = { actions: 0, finished: false };
+    const call = toolCaller(createAndroidTools(device, state, { settleMs: 0 }));
+
+    const observation = await call("screenshot", {});
+    expect(observation).toContain('[0] android.widget.ImageView desc="Shutter"');
+    await call("click", { index: 0 });
+
+    expect(taps).toEqual([[540, 2180]]);
+    expect(state.actions).toBe(1);
+  });
+
+  it("rejects an element index that was not in the latest observation", async () => {
+    const call = toolCaller(createAndroidTools(
+      staticDevice(), { actions: 0, finished: false }, { settleMs: 0 },
+    ));
+
+    await call("screenshot", {});
+    await expect(call("click", { index: 9 })).rejects.toThrow("was not present");
   });
 });
 
@@ -177,6 +309,24 @@ describe("progress guard", () => {
 });
 
 describe("execution ledger", () => {
+  it("removes the complete ledger tool lifecycle when disabled", () => {
+    const state: AgentState = { actions: 0, finished: false };
+    const tools = createAndroidTools(staticDevice(), state, {
+      settleMs: 0,
+      ledgerEnabled: false,
+      ledgerRequired: false,
+      originalTask: "Do not create a ledger",
+    });
+    const names = tools.map((tool) => tool.name);
+    expect(names).not.toContain("update_ledger");
+    expect(names).not.toContain("reflect_on_ledger");
+    expect(names).not.toContain("validate_ledger");
+    expect(names).not.toContain("answer");
+    expect(names).not.toContain("finish");
+    expect(state.finished).toBe(false);
+    expect(state.ledgerPath).toBeUndefined();
+  });
+
   it("writes the ledger into the configured result directory", async () => {
     const root = await mkdtemp(join(tmpdir(), "pi-gui-ledger-result-"));
     temporaryDirectories.push(root);
@@ -505,7 +655,18 @@ function staticDevice(): AdbDevice {
   image.writeUInt32BE(2400, 20);
   device.screenSize = async () => ({ width: 1080, height: 2400 });
   device.tap = async () => {};
-  device.visibleText = async () => ["Unchanged"];
+  const elements: UiElement[] = [{
+    index: 0,
+    contentDesc: "Shutter",
+    resourceId: "com.android.camera2:id/shutter_button",
+    className: "android.widget.ImageView",
+    clickable: true,
+    enabled: true,
+    bounds: "[390,2022][690,2337]",
+    center: { x: 540, y: 2180 },
+  }];
+  device.uiElements = async () => elements;
+  device.visibleText = async () => ["Shutter"];
   device.screenshot = async () => image;
   return device;
 }

@@ -1,0 +1,38 @@
+Use case: infographic-diagram
+Asset type: camera-ready academic paper figure, wide landscape
+
+Input images:
+- Image 1 is the STYLE AND COMPOSITION REFERENCE. Match its visual language closely: real phone screenshots, blue hand-drawn-style thought boxes, orange action boxes, orange arrows, selective red/green italic emphasis, white background, serif body copy, compact paper-figure density.
+- Image 2 is the REAL SCREENSHOT before reflection: the sorting sheet is open with “Smart sort” and the agent has confused the “Subtasks / By due date” row with the main sorting control.
+- Image 3 is the REAL SCREENSHOT after the corrected click: the menu lists “By due date”, “By start date”, “By priority”, etc.
+- Image 4 is the REAL SCREENSHOT confirming recovery: the sorting sheet now says “Sorting / By priority / Descending”.
+- Image 5 is the REAL FINAL SCREENSHOT: high-priority tasks are grouped first and “Marketing Campaign Launch” is visibly due “Wed”.
+
+Primary request:
+Create one polished academic figure that explains a reflection-driven recovery episode from an AndroidWorld agent trajectory. Use the real screenshots as screenshot panels; keep their actual UI content recognizable. Extract only the critical causal steps. The central message is: the agent initially targets the wrong sorting control and issues an invalid pixel-coordinate swipe; reflect_on_ledger diagnoses both mistakes and redirects the agent to the clickable Sorting row; the agent selects By priority, then identifies the correct task.
+
+Composition:
+- Wide 16:9 figure on a clean white background.
+- Top-center small title: “Reflection-Driven Recovery in AndroidWorld”.
+- A left-to-right trajectory with four phone screenshot panels, similar in scale and framing to Image 1.
+- Panel 1, label “Mistaken state”: use Image 2. Beside it a blue thought box containing: “I need to sort the tasks, but I selected the Subtasks row.” Under it an orange action box: “click(By due date)”. Mark this action with a red failure cross.
+- Center, dominant reflection panel with a light green rounded container titled “Execution-Ledger Reflection”. Inside show exactly three short fields:
+  “Observed failure: Wrong sorting control; swipe used pixel coordinates.”
+  “Diagnosis: The main Sorting row remains on Smart sort.”
+  “Next action: Open Sorting and choose By priority.”
+  Emphasize diagnosis and next action in green italic text. Connect the failed action to this panel with an orange arrow.
+- Panel 2, label “Revised action”: use Image 3, with a callout pointing at “By priority”. Blue thought box: “The reflection identifies the correct control and target.” Orange action box: “click(By priority)”. Mark successful with a green check.
+- Panel 3, label “Recovered state”: use Image 4. Add a thin green highlight around “Sorting / By priority”.
+- Panel 4, label “Verified result”: use Image 5. Highlight only the row “Marketing Campaign Launch” and its “Wed” due date with a subtle green outline. Add a compact blue validation box: “High priority + Wed (Oct. 18) → Marketing Campaign Launch”.
+- Use clear arrows between stages. Keep the layout dense but readable, with no large empty regions.
+
+Style:
+Match Image 1 closely rather than using modern dashboard cards. Academic figure styling, real mobile screenshots, thin colored outlines, slightly informal handwritten display labels, serif explanatory copy, orange outlined action boxes, blue outlined thought boxes, green reflection container, red for failure and green for correction. White background. High visual hierarchy and crisp print readability.
+
+Constraints:
+- Preserve the real screenshots and their visible UI as faithfully as possible; do not invent another app or phone UI.
+- Keep all requested English text verbatim and readable.
+- Do not add a caption inside the image.
+- Do not add legends, timelines, generic flowchart nodes, decorative gradients, shadows, 3D elements, logos, or watermarks.
+- Do not claim that reflection itself solved the task; show that it changed the next action, which then produced the recovered state.
+- Avoid clutter and repeated prose. The core visual contrast must be mistake → explicit reflection → corrected action → verified result.

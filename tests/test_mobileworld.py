@@ -83,6 +83,7 @@ class MobileWorldConfigTest(unittest.TestCase):
     self.assertIn('/project/experiments/mobileworld/agent.py', evaluation)
     self.assertTrue(config.mobileworld.reuse_containers)
     self.assertTrue(config.mobileworld.keep_containers)
+    self.assertEqual(config.agent.max_steps, 100)
     self.assertEqual(config.mobileworld.startup_timeout_seconds, 900)
     self.assertFalse(hasattr(config.mobileworld, 'source_dir'))
     self.assertFalse(hasattr(config.experiment, 'output_root'))
@@ -99,6 +100,8 @@ class MobileWorldConfigTest(unittest.TestCase):
       environment = _agent_environment(config, Path('/project'), Path('/output'))
     self.assertEqual(environment['HTTP_PROXY'], config.mobileworld.proxy_url)
     self.assertEqual(environment['PI_GUI_PROXY_RELAY_PORT'], '17892')
+    self.assertEqual(environment['PI_GUI_MAX_STEPS'], '100')
+    self.assertEqual(environment['PI_GUI_DISABLE_LEDGER_TOOL'], '0')
 
   @mock.patch('experiments.mobileworld.run.subprocess.run')
   def test_reuses_only_healthy_containers_from_current_image(self, run):

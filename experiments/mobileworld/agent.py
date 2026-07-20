@@ -74,6 +74,7 @@ class PiGuiMobileWorldAgent(BaseAgent):
         '--adb', adb, '--serial', 'emulator-5554',
         '--thinking', os.environ.get('PI_GUI_THINKING', 'medium'),
         '--max-actions', os.environ.get('PI_GUI_MAX_ACTIONS', '50'),
+        '--max-steps', os.environ.get('PI_GUI_MAX_STEPS', '100'),
         '--max-model-tokens', os.environ.get('PI_GUI_MAX_MODEL_TOKENS', '4096'),
         '--settle-ms', os.environ.get('PI_GUI_SETTLE_MS', '1500'),
         '--result-file', str(result_file), '--session-dir', container_session,
@@ -87,6 +88,8 @@ class PiGuiMobileWorldAgent(BaseAgent):
       command.extend(['--provider', provider, '--model', model])
     if os.environ.get('PI_GUI_LEARNING', '0') != '1':
       command.append('--no-learning')
+    if os.environ.get('PI_GUI_DISABLE_LEDGER_TOOL', '0') == '1':
+      command.append('--disable-ledger-tool')
     instruction = (
         self.instruction + '\n\nMobileWorld app names are configured for open_app; '
         'use the friendly names in the task directly.'
@@ -121,6 +124,9 @@ class PiGuiMobileWorldAgent(BaseAgent):
           'finished': finished,
           'returncode': result.returncode,
           'actions': payload.get('actions', 0),
+          'steps': payload.get('steps', 0),
+          'aborted': payload.get('aborted', False),
+          'abort_reason': payload.get('abortReason'),
           'answer': answer,
           'stdout': result.stdout[-4000:],
           'stderr': result.stderr[-4000:],

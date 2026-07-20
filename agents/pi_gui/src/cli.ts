@@ -12,16 +12,19 @@ const program = new Command()
   .argument("<task>", "task to perform on the phone")
   .option("--serial <serial>", "ADB device serial")
   .option("--adb <path>", "path to adb", "adb")
+  .option("--server-url <url>", "AndroidWorld FastAPI server URL")
   .option("--provider <provider>", "pi model provider")
   .option("--model <model>", "pi model id")
   .option("--thinking <level>", "off|minimal|low|medium|high|xhigh", "medium")
   .option("--max-actions <number>", "maximum device-changing actions", positiveInteger, 30)
+  .option("--max-steps <number>", "maximum Thinking & action steps", positiveInteger, 100)
   .option("--max-no-progress-actions <number>", "warn and replan after this many unchanged or repeated actions", positiveInteger, 4)
   .option("--max-model-tokens <number>", "maximum output tokens for each model turn", positiveInteger, 4096)
   .option("--settle-ms <number>", "delay after each action", nonNegativeNumber, 1500)
   .option("--result-file <path>", "write the final machine-readable result")
   .option("--session-dir <path>", "directory for pi session logs")
   .option("--ledger-dir <path>", "directory for managed execution ledgers", ".pi/ledgers")
+  .option("--disable-ledger-tool", "disable execution ledger tools and ledger instructions")
   .option("--learning-root <path>", "directory for persistent memory and skills", defaultLearningRoot)
   .option("--app-map <json>", "benchmark-specific friendly app name mapping", appMap, {})
   .option("--no-learning", "disable post-task memory and skill review")
@@ -32,16 +35,19 @@ const program = new Command()
     const state = await runTask(task, {
       adbPath: flags.adb,
       serial: flags.serial,
+      serverUrl: flags.serverUrl,
       provider: flags.provider,
       model: flags.model,
       thinking: flags.thinking,
       maxActions: flags.maxActions,
+      maxSteps: flags.maxSteps,
       maxNoProgressActions: flags.maxNoProgressActions,
       maxModelTokens: flags.maxModelTokens,
       settleMs: flags.settleMs,
       learning: flags.learning,
       sessionDir: flags.sessionDir,
       ledgerDir: flags.ledgerDir,
+      disableLedgerTool: flags.disableLedgerTool,
       learningRoot: flags.learningRoot,
       appMap: flags.appMap,
       onText: (text) => process.stdout.write(text),
@@ -57,6 +63,9 @@ const program = new Command()
           finished: state.finished,
           answer: state.answer,
           actions: state.actions,
+          steps: state.steps ?? 0,
+          aborted: state.aborted ?? false,
+          abortReason: state.abortReason,
           progressWarnings: state.progressWarnings ?? 0,
           stalled: state.stalled ?? false,
           ledgerPath: state.ledgerPath,
@@ -66,6 +75,7 @@ const program = new Command()
     }
     process.stdout.write("\n");
     if (state.answer) console.log(`Answer: ${state.answer}`);
+    if (state.abortReason) console.error(`Aborted: ${state.abortReason}`);
     if (!state.finished) process.exitCode = 2;
   });
 

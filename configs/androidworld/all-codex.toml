@@ -1,0 +1,12 @@
+extends = "baseline-codex.toml"
+
+[experiment]
+name = "androidworld-all-codex"
+workers = 5
+
+[suite]
+# An empty task list means every task in the AndroidWorld registry.
+tasks = []
+
+[container]
+name_prefix = "codex-androidworld-all"

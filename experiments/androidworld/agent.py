@@ -27,7 +27,10 @@ class AndroidWorldCodingAgent(base_agent.EnvironmentInteractingAgent):
       timeout_seconds: int = 900, thinking: str = 'medium',
       settle_ms: int = 1500,
       session_dir: str | None = None, action_budget_multiplier: float = 2.0,
-      min_actions: int = 30, name: str | None = None, **_: Any,
+      min_actions: int = 30, name: str | None = None,
+      server_url: str | None = None, enable_ledger_tool: bool = False,
+      disable_ledger_tool: bool = False,
+      **_: Any,
   ) -> None:
     super().__init__(env, name=name or self.agent_id, transition_pause=None)
     self.workspace_dir = Path(workspace_dir).resolve()
@@ -39,6 +42,10 @@ class AndroidWorldCodingAgent(base_agent.EnvironmentInteractingAgent):
     self.session_dir = session_dir
     self.action_budget_multiplier = action_budget_multiplier
     self.min_actions = min_actions
+    self.server_url = server_url
+    self.enable_ledger_tool = enable_ledger_tool
+    self.disable_ledger_tool = disable_ledger_tool
+    self._current_goal: str | None = None
     self._ran = False
 
   def reset(self, go_home: bool = False) -> None:
@@ -52,6 +59,7 @@ class AndroidWorldCodingAgent(base_agent.EnvironmentInteractingAgent):
           data={'goal': goal, 'error': 'Agent was already run for this episode.'},
       )
     self._ran = True
+    self._current_goal = goal
     self.validate()
     android_world_steps = self._max_steps if self._max_steps is not None else 30
     max_actions = max(
@@ -103,15 +111,46 @@ class AndroidWorldCodingAgent(base_agent.EnvironmentInteractingAgent):
     entrypoint = os.environ.get('ANDROID_GUI_MCP_BIN') or str(
         self.workspace_dir / 'agents' / 'pi_gui' / 'dist' / 'mcp.js'
     )
-    args = [
-        entrypoint, '--adb', self.adb_path, '--serial', self.serial,
+    args = [entrypoint]
+    if self.server_url:
+      args.extend(['--server-url', self.server_url])
+    else:
+      args.extend(['--adb', self.adb_path, '--serial', self.serial])
+    args.extend([
         '--settle-ms', str(self.settle_ms), '--max-actions', str(max_actions),
-    ]
+    ])
     if self.session_dir:
       args.extend([
           '--screenshot-dir', str(Path(self.session_dir) / 'mcp-screenshots'),
       ])
     return args
+
+  def ledger_mcp_args(
+      self, max_actions: int, original_task: str | None = None,
+  ) -> list[str]:
+    args = self.mcp_args(max_actions)
+    args.extend([
+        '--toolset', 'ledger',
+        '--task', original_task or self._current_goal or 'Unknown task',
+    ])
+    if self.session_dir:
+      args.extend([
+          '--ledger-dir', str(Path(self.session_dir).parent / 'ledgers'),
+      ])
+    return args
+
+  def mcp_servers(
+      self, max_actions: int, original_task: str | None = None,
+  ) -> dict[str, dict[str, Any]]:
+    servers = {
+        'android-gui': {'command': 'node', 'args': self.mcp_args(max_actions)},
+    }
+    if self.enable_ledger_tool:
+      servers['ledger'] = {
+          'command': 'node',
+          'args': self.ledger_mcp_args(max_actions, original_task),
+      }
+    return servers
 
   def read_result(self, path: Path) -> dict[str, Any]:
     del path
@@ -141,15 +180,26 @@ class AndroidWorldCodingAgent(base_agent.EnvironmentInteractingAgent):
     }
 
   def _prompt(self, goal: str) -> str:
+    transport = (
+        'All environment observation and actions must go through the '
+        'android-gui MCP tools. ADB access is intentionally unavailable in '
+        'this FastAPI evaluation mode. '
+        if self.server_url else
+        f'Use ADB with the serial {self.serial!r} for suitable auxiliary work. '
+    )
+    ledger = (
+        'Use the ledger MCP tools update_ledger, reflect_on_ledger, and '
+        'validate_ledger to track progress, reflect when useful, and validate '
+        'the final result before stopping. '
+        if self.enable_ledger_tool else ''
+    )
     return (
         'You are operating an isolated AndroidWorld emulator. Complete the '
         'task using the android-gui MCP tools: screenshot, tap, long_press, '
         'swipe, type_text, open_app, and back. Every GUI action returns the '
         'updated screenshot and visible UI text; use screenshot whenever you '
-        'need to inspect the current UI without performing an action. Bash and '
-        'ADB commands are also available for auxiliary work, deterministic '
-        'checks, or to complete suitable tasks more quickly. Use ADB with '
-        f'the serial {self.serial!r}, perform the requested actions, and verify the '
+        'need to inspect the current UI without performing an action. '
+        f'{transport}{ledger}Perform the requested actions and verify the '
         f'final state before stopping.\n\nTask: {goal}'
     )
 
@@ -187,7 +237,8 @@ class AndroidWorldCodingAgent(base_agent.EnvironmentInteractingAgent):
   def _additional_runtime_directories(
       self, session_dir: Path,
   ) -> tuple[Path, ...]:
-    del session_dir
+    if self.enable_ledger_tool:
+      return (session_dir.parent / 'ledgers',)
     return ()
 
   def _as_agent_user(self, command: list[str]) -> list[str]:
@@ -209,6 +260,9 @@ def attempt_data(
   return {
       'attempt': 1, 'returncode': result.returncode,
       'actions': agent_result.get('actions', 0),
+      'steps': agent_result.get('steps', 0),
+      'aborted': agent_result.get('aborted', False),
+      'abort_reason': agent_result.get('abortReason'),
       'finished': agent_result.get('finished') is True or result.returncode == 0,
       'ledger_path': agent_result.get('ledgerPath'),
       'stdout': result.stdout[-4_000:], 'stderr': result.stderr[-4_000:],

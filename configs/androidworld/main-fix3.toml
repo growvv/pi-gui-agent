@@ -1,0 +1,35 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-main-fix3"
+workers = 5
+
+[suite]
+# Retry the 19 failed and 1 unrecorded case from
+# benchmark-results/androidworld-main-fix2-20260720T133613+0800.
+# 3 exception case: SimpleSmsReplyMostRecent SimpleSmsSendReceivedAddress SimpleSmsResend
+tasks = [
+  "BrowserDraw",
+  "BrowserMaze",
+  "BrowserMultiply",
+  "ClockStopWatchRunning",
+  "ClockTimerEntry",
+  "ContactsNewContactDraft",
+  "ExpenseAddMultipleFromGallery",
+  "ExpenseAddMultipleFromMarkor",
+  "MarkorCreateNoteFromClipboard",
+  "MarkorMergeNotes",
+  "OsmAndTrack",
+  "RecipeDeleteDuplicateRecipes3",
+  "RetroPlayingQueue",
+  "SimpleCalendarAddOneEventRelativeDay",
+  "SimpleCalendarNextMeetingWithPerson",
+  "SimpleSmsReply",
+  "SimpleSmsSend",
+  "SimpleSmsSendClipboardContent",
+  "SportsTrackerTotalDurationForCategoryThisWeek",
+  "TasksCompletedTasksForDate",
+]
+
+[container]
+name_prefix = "pi-gui-androidworld-main-fix3"

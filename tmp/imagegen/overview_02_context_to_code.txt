@@ -1,0 +1,24 @@
+Use case: infographic-diagram
+Asset type: camera-ready overview figure for a computer science paper
+Input images: Image 1 is the primary style reference; Image 2 is a secondary style and subject reference. Match their academic visual language: white background, phone screenshots, blue thought boxes, orange action arrows, green structured-state panels, serif explanatory text.
+
+Create a wide 16:9 overview figure for the paper titled exactly:
+"CodeDroid: Executable Task State Management for Long-Horizon Hybrid Mobile Agents"
+
+Composition concept: FROM IMPLICIT CONTEXT TO EXECUTABLE STATE.
+Use a clear left-versus-right comparison separated by a thin dashed divider.
+
+Left side title: "Implicit conversational state"
+Show a long cluttered trail of screenshots, repeated actions, scattered thoughts, forgotten subtasks, and a faded early failure. Mark the outcome with restrained red text: "progress is buried in history". Make this side visually tangled but still professional.
+
+Right side title: "CodeDroid: explicit executable state"
+Show the same hybrid GUI+CLI agent grounded by one clean green "ledger.sh" document. The script contains task, subtask, complete_subtask, reflection, validation, finish. Three labeled tool calls maintain it: "update_ledger", "reflect_on_ledger", "validate_ledger". From the ledger, a precise arrow points to the next GUI or CLI action, followed by validation and controlled finish.
+
+Place a transformation arrow through the center labeled exactly:
+"Progress as text history -> Progress as executable code"
+
+Core message, verbatim:
+"Persistent state survives long context and guides the next action."
+
+Style: closely match Image 1, academic comparison figure, real phone screenshot motifs, thin blue thought boxes, orange action boxes and arrows, green CodeDroid side, serif body text, high print readability.
+Constraints: no caption, no experimental numbers, no logos, no watermark, no gradients, no 3D, no generic dashboard, no invented tool names, no misspelled labels.

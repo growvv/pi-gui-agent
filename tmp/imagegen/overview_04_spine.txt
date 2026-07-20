@@ -1,0 +1,27 @@
+Use case: infographic-diagram
+Asset type: camera-ready overview figure for a computer science paper
+Input images: Image 1 is the primary style reference; Image 2 is a secondary style and subject reference. Match their academic visual language: white background, phone screenshots, blue thought boxes, orange action arrows, green code/state panels, compact paper-figure density.
+
+Create a wide 16:9 overview figure for the paper titled exactly:
+"CodeDroid: Executable Task State Management for Long-Horizon Hybrid Mobile Agents"
+
+Composition concept: EXECUTABLE SPINE ACROSS A LONG-HORIZON TASK.
+Use a left-to-right sequence of four task stages across the top: Plan -> Act -> Recover -> Verify. Each stage includes a small real-looking Android phone screenshot and one concise thought/action callout in the visual style of Image 1.
+
+Across the full width beneath these stages, draw one continuous green executable Bash script named "Execution Ledger (ledger.sh)". Show the script accumulating records at each stage:
+1. task + subtask + subtask_for_validate
+2. complete_subtask
+3. reflection with reason and next step
+4. validation complete + finish passed
+
+Connect each phone stage vertically to the corresponding appended code lines. Place the first-class tools above the code additions: "update_ledger", "reflect_on_ledger", "validate_ledger". Make the accumulated code visibly persist from left to right, while transient screenshots change above it.
+
+Highlight the contrast with two small labels:
+"Transient observations" above the phones
+"Persistent executable state" above ledger.sh
+
+Core message, verbatim:
+"The screen changes. The executable ledger remembers."
+
+Style: closely match Image 1, dense academic trajectory figure, authentic phone proportions, blue thoughts, orange actions, green code spine, serif body text, crisp and restrained.
+Constraints: no caption, no benchmark numbers, no logos, no watermark, no gradients, no 3D, no generic flowchart blocks, no invented tools, no misspelled labels.

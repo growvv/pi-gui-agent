@@ -1,0 +1,28 @@
+Use case: infographic-diagram
+Asset type: camera-ready architecture overview for a computer science paper
+Input images: Image 1 is the primary style reference; Image 2 is a secondary style and subject reference. Match their academic visual language: white background, real-looking phone screenshots, thin blue and orange annotations, green structured code panels, serif explanatory text.
+
+Create a wide 16:9 overview figure for the paper titled exactly:
+"CodeDroid: Executable Task State Management for Long-Horizon Hybrid Mobile Agents"
+
+Composition concept: THREE-LAYER CLOSED-LOOP ARCHITECTURE.
+Use three horizontal bands, but avoid generic dashboard cards.
+
+Top band: "Hybrid Coding Agent"
+Show the agent reasoning from current observation plus explicit ledger state, then selecting a tool.
+
+Middle band: "First-class tools"
+Place GUI tools and CLI/Bash tools on the outer sides. In the center, prominently place the three ledger tools: "update_ledger", "reflect_on_ledger", "validate_ledger". All tool families must appear at the same decision level to emphasize that progress management is a first-class action.
+
+Bottom band: "Runtime state"
+Show an Android device under GUI tools, a terminal/filesystem under CLI tools, and an executable "ledger.sh" under ledger tools. Use arrows returning Android observations and ledger state to the agent. Show ledger.sh containing task, subtask, complete_subtask, reflection, validation, finish.
+
+Add a controlled completion path on the right: subtask_for_validate -> validate_ledger -> finish. Add a reflection recovery path on the left: failed GUI/CLI action -> reflect_on_ledger -> revised action.
+
+Core message in a prominent green line:
+"Progress management becomes an explicit, executable tool action."
+Supporting line:
+"One agent loop, three action spaces: GUI, CLI, and task-state management."
+
+Style: closely match Image 1, hand-drawn academic architecture figure rather than modern SaaS UI, white background, orange arrows, blue thought labels, green executable code, restrained red failures, crisp print typography.
+Constraints: no caption, no benchmark numbers, no logos, no watermark, no gradients, no 3D, no generic dashboard cards, no invented tools, no misspelled labels.

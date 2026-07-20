@@ -1,0 +1,53 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-long-codex-ledger"
+workers = 1
+worker_start_interval_seconds = 30
+startup_cpu_max_percent = 30
+startup_cpu_stable_samples = 3
+startup_cpu_timeout_seconds = 600
+
+[agent]
+name = "codex"
+provider = "xiaomi-token-plan-cn"
+model = "mimo-v2.5"
+thinking = "high"
+learning = false
+enable_ledger_tool = true
+
+[suite]
+# Tasks with more than 50 Thinking & action steps in
+# benchmark-results/androidworld-all, sorted by descending step count.
+# transport = "fastapi"
+tasks = [
+  "MarkorChangeNoteContent",                         # 234
+  "RecipeAddMultipleRecipesFromMarkor2",            # 161
+  "RecipeAddMultipleRecipes",                       # 151
+  "OsmAndTrack",                                    # 129
+  "MarkorTranscribeVideo",                          # 112
+  "SimpleSmsResend",                                # 101
+  "BrowserDraw",                                    # 96
+  "SimpleSmsSendClipboardContent",                  # 85
+  "RecipeAddMultipleRecipesFromImage",              # 84
+  "MarkorCreateNoteAndSms",                         # 78
+  "RecipeDeleteDuplicateRecipes3",                  # 75
+  "MarkorCreateNote",                               # 74
+  "RecipeDeleteDuplicateRecipes2",                  # 73
+  "RecipeAddMultipleRecipesFromMarkor",             # 68
+  "SportsTrackerTotalDistanceForCategoryOverInterval", # 61
+  "MarkorAddNoteHeader",                            # 60
+  "ExpenseAddMultiple",                             # 58
+  "SimpleDrawProCreateDrawing",                     # 58
+  "SportsTrackerActivityDuration",                  # 58
+  "MarkorTranscribeReceipt",                        # 57
+  "RecipeDeleteMultipleRecipesWithNoise",           # 56
+  "TasksCompletedTasksForDate",                     # 56
+  "MarkorMergeNotes",                               # 55
+  "SportsTrackerLongestDistanceActivity",           # 53
+  "MarkorEditNote",                                 # 52
+  "MarkorCreateNoteFromClipboard",                  # 51
+]
+
+[container]
+name_prefix = "codex-androidworld-long-ledger"

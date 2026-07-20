@@ -26,8 +26,19 @@ class CodexAgent(AndroidWorldCodingAgent):
         '-c', 'web_search="disabled"',
         '-c', 'shell_environment_policy.exclude=["OPENAI_API_KEY"]',
         '--disable', 'standalone_web_search',
+        '-c', 'mcp_servers={}',
         '-c', 'mcp_servers.android_gui.command="node"',
         '-c', f'mcp_servers.android_gui.args={_toml_array(args)}',
+    ])
+    if self.enable_ledger_tool:
+      ledger_args = self.ledger_mcp_args(
+          max_actions, self._current_goal or prompt,
+      )
+      command.extend([
+          '-c', 'mcp_servers.ledger.command="node"',
+          '-c', f'mcp_servers.ledger.args={_toml_array(ledger_args)}',
+      ])
+    command.extend([
         '--model', 'mimo-v2.5',
         '--dangerously-bypass-approvals-and-sandbox',
         '--skip-git-repo-check', prompt,

@@ -17,6 +17,12 @@ from typing import Any, TextIO
 from dotenv import dotenv_values
 
 from .config import AndroidWorldConfig, load_config
+from .registry_metadata import load_task_registry_metadata
+from .state import write_worker_state
+
+
+DEFAULT_DOCKER_NETWORK = 'pi-gui-androidworld-ipv6'
+DEFAULT_DOCKER_IPV6_SUBNET = 'fd42:7069:6775::/64'
 
 
 def parse_args() -> argparse.Namespace:
@@ -137,6 +143,10 @@ def _prepare_workers(
       for directory in ('checkpoints', 'ledgers', 'runs', 'learning'):
         (worker_dir / directory).mkdir()
       _write_json(config_path, config.worker_payload(shard))
+      write_worker_state(
+          worker_dir / 'state.json', shard, config.suite.combinations, [],
+          config.agent.max_steps, 'pending',
+      )
     agent_config_dir = _prepare_agent_config(config, worker_dir, write=write)
     if config.container.keep_containers:
       run_id = ''.join(
@@ -165,10 +175,13 @@ def _start_workers(
     config: AndroidWorldConfig, project_dir: Path, output_dir: Path,
     shards: list[list[str]],
 ) -> list[dict[str, Any]]:
+  _ensure_worker_network()
   workers = _prepare_workers(config, project_dir, output_dir, shards, write=True)
   started = []
   try:
     for worker in workers:
+      if started:
+        _wait_for_start_capacity(config.experiment, len(started) + 1)
       log_path = worker['worker_dir'] / 'worker.log'
       log_handle = log_path.open('w', encoding='utf8')
       try:
@@ -218,6 +231,51 @@ def _start_workers(
   return workers
 
 
+def _wait_for_start_capacity(settings, worker_id: int) -> None:
+  """Delay worker startup until host CPU has settled after the prior launch."""
+  if settings.worker_start_interval_seconds:
+    print(
+        f'[startup] waiting {settings.worker_start_interval_seconds:g}s before '
+        f'starting worker-{worker_id}', flush=True,
+    )
+    time.sleep(settings.worker_start_interval_seconds)
+  threshold = settings.startup_cpu_max_percent
+  if threshold is None:
+    return
+  deadline = time.monotonic() + settings.startup_cpu_timeout_seconds
+  stable = 0
+  while time.monotonic() < deadline:
+    usage = _host_cpu_percent()
+    stable = stable + 1 if usage <= threshold else 0
+    print(
+        f'[startup] host CPU {usage:.1f}% (need <= {threshold:g}% for '
+        f'{settings.startup_cpu_stable_samples} samples); '
+        f'worker-{worker_id} waiting', flush=True,
+    )
+    if stable >= settings.startup_cpu_stable_samples:
+      return
+    time.sleep(5.0)
+  print(
+      f'[startup] CPU wait timed out; starting worker-{worker_id}', flush=True,
+  )
+
+
+def _host_cpu_percent(sample_seconds: float = 1.0) -> float:
+  def counters() -> tuple[int, int]:
+    fields = Path('/proc/stat').read_text(encoding='ascii').splitlines()[0].split()[1:]
+    values = [int(value) for value in fields]
+    idle = values[3] + (values[4] if len(values) > 4 else 0)
+    return sum(values), idle
+
+  total_before, idle_before = counters()
+  time.sleep(sample_seconds)
+  total_after, idle_after = counters()
+  elapsed = total_after - total_before
+  if elapsed <= 0:
+    return 0.0
+  return 100.0 * (1.0 - (idle_after - idle_before) / elapsed)
+
+
 def _relay_worker_output(worker_id: int, stream: TextIO, log: TextIO) -> None:
   """Tee one worker's output to its log and the shared terminal."""
   try:
@@ -241,6 +299,7 @@ def _docker_command(
     command.append('--rm')
   command.extend([
       '--privileged', '--device', '/dev/kvm',
+      '--network', _worker_network_settings()[0],
       '--name', container_name,
       '-e', 'PYTHONPATH=/workspace/pi-gui-agent:/',
       '-e', 'PYTHONUNBUFFERED=1',
@@ -286,10 +345,71 @@ def _docker_command(
     ])
   command.extend([
       config.image,
-      'python3', '-m', 'experiments.androidworld.run',
+      'python3', '-m', (
+          'experiments.androidworld.http_run'
+          if config.suite.transport == 'fastapi'
+          else 'experiments.androidworld.run'
+      ),
       f'/output/{config_path.name}',
   ])
   return command
+
+
+def _worker_network_settings() -> tuple[str, str]:
+  return (
+      os.environ.get('ANDROIDWORLD_DOCKER_NETWORK', DEFAULT_DOCKER_NETWORK),
+      os.environ.get(
+          'ANDROIDWORLD_DOCKER_IPV6_SUBNET', DEFAULT_DOCKER_IPV6_SUBNET,
+      ),
+  )
+
+
+def _ensure_worker_network() -> str:
+  """Create the IPv6 bridge required by the emulator modem simulator."""
+  name, subnet = _worker_network_settings()
+  inspect = subprocess.run(
+      ['docker', 'network', 'inspect', name], check=False,
+      capture_output=True, text=True,
+  )
+  if inspect.returncode == 0:
+    _validate_worker_network(name, inspect.stdout)
+    return name
+
+  create = subprocess.run(
+      [
+          'docker', 'network', 'create', '--driver', 'bridge', '--ipv6',
+          '--subnet', subnet, name,
+      ],
+      check=False, capture_output=True, text=True,
+  )
+  # Inspect after creation, including the case where another experiment won
+  # the create race and Docker returned "already exists".
+  inspect = subprocess.run(
+      ['docker', 'network', 'inspect', name], check=False,
+      capture_output=True, text=True,
+  )
+  if inspect.returncode != 0:
+    detail = create.stderr.strip() or create.stdout.strip()
+    raise RuntimeError(f'Could not create Docker network {name}: {detail}')
+  _validate_worker_network(name, inspect.stdout)
+  return name
+
+
+def _validate_worker_network(name: str, raw: str) -> None:
+  try:
+    network = json.loads(raw)[0]
+  except (IndexError, json.JSONDecodeError, TypeError) as error:
+    raise RuntimeError(f'Could not inspect Docker network {name}') from error
+  ipv6_subnets = [
+      item.get('Subnet', '')
+      for item in network.get('IPAM', {}).get('Config', [])
+      if ':' in item.get('Subnet', '')
+  ]
+  if not network.get('EnableIPv6') or not ipv6_subnets:
+    raise RuntimeError(
+        f'Docker network {name} must have IPv6 enabled for the Android '
+        'emulator modem simulator.'
+    )
 
 
 def _prepare_agent_config(
@@ -321,16 +441,8 @@ def _agent_config_dir(config: AndroidWorldConfig) -> Path | None:
 
 
 def _load_task_registry(image: str, family: str) -> dict[str, float]:
-  script = (
-      'import json; from android_world import registry; '
-      f'r=registry.TaskRegistry().get_registry({family!r}); '
-      'print(json.dumps({n:float(getattr(c,"complexity",1)) for n,c in r.items()}))'
-  )
-  result = subprocess.run(
-      ['docker', 'run', '--rm', '--entrypoint', 'python3', image, '-c', script],
-      check=True, capture_output=True, text=True,
-  )
-  return json.loads(result.stdout)
+  metadata = load_task_registry_metadata(image, family)
+  return {name: row['complexity'] for name, row in metadata.items()}
 
 
 def _balanced_shards(registry: dict[str, float], count: int) -> list[list[str]]:
@@ -358,7 +470,11 @@ def _manifest(
       'model': config.agent.model,
       'thinking': config.agent.thinking,
       'learning': config.agent.learning,
+      'enable_ledger_tool': config.agent.enable_ledger_tool,
+      'disable_ledger_tool': config.agent.disable_ledger_tool,
+      'max_steps': config.agent.max_steps,
       'setup_mode': config.suite.setup_mode,
+      'transport': config.suite.transport,
       'container_image': config.image,
       'task_template_count': len(registry),
       'expected_episodes': len(registry) * config.suite.combinations,

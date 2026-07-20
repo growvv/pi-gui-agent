@@ -1,0 +1,12 @@
+extends = "baseline-claude-code.toml"
+
+[experiment]
+name = "androidworld-all-claude-code"
+workers = 5
+
+[suite]
+# An empty task list means every task in the AndroidWorld registry.
+tasks = []
+
+[container]
+name_prefix = "claude-code-androidworld-all"

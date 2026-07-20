@@ -17,6 +17,7 @@ class PiGuiAgent(AndroidWorldCodingAgent):
       self, *args: Any, node_path: str = 'node', learning: bool = False,
       provider: str | None = None, model: str | None = None,
       settle_ms: int = 1500, max_model_tokens: int = 4096,
+      max_steps: int = 100,
       pi_gui_dir: str | None = None, **kwargs: Any,
   ) -> None:
     super().__init__(*args, **kwargs)
@@ -28,6 +29,7 @@ class PiGuiAgent(AndroidWorldCodingAgent):
     self.model = model
     self.settle_ms = settle_ms
     self.max_model_tokens = max_model_tokens
+    self.max_steps = max_steps
 
   def validate(self) -> None:
     entrypoint = self.pi_gui_dir / 'dist' / 'cli.js'
@@ -43,26 +45,37 @@ class PiGuiAgent(AndroidWorldCodingAgent):
   def _additional_runtime_directories(
       self, session_dir: Path,
   ) -> tuple[Path, ...]:
+    if self.disable_ledger_tool:
+      return ()
     return (session_dir.parent / 'ledgers',)
 
   def build_command(self, prompt: str, max_actions: int, result_file: Path) -> list[str]:
     command = [
         self.node_path, str(self.pi_gui_dir / 'dist' / 'cli.js'),
-        '--adb', self.adb_path, '--serial', self.serial,
         '--max-actions', str(max_actions), '--max-model-tokens',
-        str(self.max_model_tokens), '--thinking', self.thinking,
+        str(self.max_model_tokens), '--max-steps', str(self.max_steps),
+        '--thinking', self.thinking,
         '--settle-ms', str(self.settle_ms), '--result-file', str(result_file),
     ]
+    if self.server_url:
+      command.extend(['--server-url', self.server_url])
+    else:
+      command.extend(['--adb', self.adb_path, '--serial', self.serial])
     if self.provider and self.model:
       command.extend(['--provider', self.provider, '--model', self.model])
     if self.session_dir:
       command.extend(['--session-dir', self.session_dir])
+      if not self.disable_ledger_tool:
+        command.extend([
+            '--ledger-dir', str(Path(self.session_dir).parent / 'ledgers'),
+        ])
       command.extend([
-          '--ledger-dir', str(Path(self.session_dir).parent / 'ledgers'),
           '--learning-root', str(Path(self.session_dir).parent / 'learning'),
       ])
     if not self.learning:
       command.append('--no-learning')
+    if self.disable_ledger_tool:
+      command.append('--disable-ledger-tool')
     command.append(prompt)
     return command
 

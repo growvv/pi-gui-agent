@@ -1,0 +1,27 @@
+extends = "main.toml"
+
+[experiment]
+name = "androidworld-main-fix5"
+workers = 5
+
+[suite]
+# Retry the 11 failed, 1 partial, and 1 exception cases from
+# benchmark-results/androidworld-all.
+tasks = [
+  "ExpenseAddMultipleFromGallery",
+  "ExpenseAddMultipleFromMarkor",
+  "MarkorCreateNoteAndSms",
+  "MarkorCreateNoteFromClipboard",
+  "OsmAndTrack",
+  "RecipeDeleteDuplicateRecipes3",
+  "SimpleCalendarAddOneEventRelativeDay",
+  "SimpleSmsReply",
+  "SimpleSmsReplyMostRecent",
+  "SimpleSmsResend",
+  "SimpleSmsSend",
+  "SimpleSmsSendClipboardContent",
+  "SimpleSmsSendReceivedAddress",
+]
+
+[container]
+name_prefix = "pi-gui-androidworld-main-fix5"
